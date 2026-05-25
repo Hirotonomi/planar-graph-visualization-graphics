@@ -15,6 +15,8 @@
 
 \geometry{margin=2.5cm}
 
+\hypersetup{hidelinks}
+
 \definecolor{codebg}{rgb}{0.95,0.95,0.95}
 \definecolor{codeframe}{rgb}{0.7,0.7,0.7}
 
@@ -47,7 +49,7 @@
 % ---------------------------------------------------------------
 \section{Cel projektu}
 
-Celem projektu jest stworzenie aplikacji w języku Java z graficznym interfejsem użytkownika (GUI) opartym na bibliotece Swing, umożliwiającej wczytywanie, wizualizację oraz interaktywną modyfikację układu wierzchołków grafów planarnych. Aplikacja stanowi graficzne uzupełnienie narzędzia konsolowego napisanego w języku C -- pozwala na wczytanie plików wynikowych wygenerowanych przez tamten program (zarówno w formacie tekstowym, jak i binarnym), jak również bezpośrednie wczytanie opisu grafu z listy krawędzi i samodzielne wyznaczenie współrzędnych przy użyciu wbudowanych algorytmów. Wyniki obliczeń mogą zostać zapisane do pliku w celu dalszego przetwarzania.
+Celem projektu jest stworzenie aplikacji w~języku Java z~graficznym interfejsem użytkownika opartym na bibliotece Swing, umożliwiającej wczytywanie, wizualizację oraz interaktywną edycję układu wierzchołków grafów planarnych. Aplikacja wywołuje zewnętrzny binarny silnik obliczeniowy w~języku C (opracowany przez zespół Poliny Vyshni i~Andreia Udavichenki) w~celu wyznaczenia współrzędnych wierzchołków przy użyciu wybranego algorytmu, a~następnie prezentuje wyniki graficznie. Możliwe jest również pominięcie etapu obliczeń i~bezpośrednie wczytanie wcześniej przygotowanego pliku pozycji. Interfejs użytkownika jest w~całości w~języku polskim.
 
 % ---------------------------------------------------------------
 \section{Opis funkcjonalności}
@@ -55,120 +57,171 @@ Celem projektu jest stworzenie aplikacji w języku Java z graficznym interfejsem
 Aplikacja udostępnia następujące funkcje:
 
 \begin{itemize}
-    \item wczytywanie opisu grafu (lista krawędzi) z pliku tekstowego za pomocą okna dialogowego,
-    \item wywołanie binarnego programu w~języku C jako procesu zewnętrznego w~celu wyznaczenia współrzędnych wierzchołków,
-    \item wybór algorytmu i~formatu wyjściowego przekazywanych jako argumenty do programu C,
+    \item wczytywanie opisu grafu (lista krawędzi) z~pliku tekstowego za pomocą okna dialogowego,
+    \item wywołanie zewnętrznego binarnego silnika obliczeniowego jako procesu potomnego z~odpowiednimi argumentami (ścieżka wejściowa, ścieżka wyjściowa, wybrany algorytm, format zapisu),
+    \item wczytanie gotowego pliku pozycji bez uruchamiania obliczeń -- w~formacie tekstowym lub binarnym,
     \item automatyczne nazwanie pliku wyjściowego na podstawie nazwy pliku wejściowego (przyrostek \texttt{\_positions}),
-    \item wyświetlenie grafu w~panelu wizualizacji po zakończeniu obliczeń,
-    \item ręczna modyfikacja współrzędnych wybranego wierzchołka bez ponownego uruchamiania algorytmu,
-    \item zmiana skali i~pozycji widoku przy użyciu suwaka zoom oraz przycisków pomocniczych,
+    \item wyświetlenie grafu w~panelu wizualizacji po zakończeniu obliczeń lub wczytaniu pliku pozycji,
+    \item interaktywna edycja pozycji wierzchołka przez przesuwanie go przyciskami kierunkowymi z~konfigurowalnym krokiem przesunięcia,
+    \item interaktywna edycja pozycji wierzchołka metodą przeciągnij i~upuść (\textit{ang.~drag \& drop}) bezpośrednio w~panelu wizualizacji,
+    \item zmiana skali i~pozycji widoku przy użyciu suwaka powiększenia oraz przycisków pomocniczych,
     \item przełączanie widoczności etykiet wierzchołków i~wag krawędzi,
-    \item czytelne komunikaty o~błędach wyświetlane bezpośrednio w~interfejsie graficznym.
+    \item czytelne komunikaty o~błędach wyświetlane w~oknach dialogowych interfejsu graficznego.
 \end{itemize}
 
 % ---------------------------------------------------------------
 \section{Interfejs graficzny}
 
-Okno główne aplikacji podzielone jest na trzy obszary: poziomy pasek menu na górze okna, lewy panel boczny zajmujący około 25--30\% szerokości okna oraz prawy obszar wizualizacji grafu wypełniający pozostałą przestrzeń. Na samym dole okna znajduje się wąski pasek stanu.
+Okno główne aplikacji podzielone jest na cztery obszary: poziomy pasek menu na górze okna, lewy panel boczny zajmujący około 25--30\% szerokości okna, prawy obszar wizualizacji grafu oraz wąski pasek stanu na dole okna. Wszystkie napisy, etykiety, przyciski i~komunikaty są wyłącznie w~języku polskim.
 
 \subsection{Pasek menu}
 
 Pasek menu jest stałym, poziomym elementem umieszczonym na górze okna. Zawiera trzy opcje, których kliknięcie przełącza zawartość lewego panelu bocznego:
 
 \begin{itemize}
-    \item \textbf{Graph settings} -- wyświetla w panelu bocznym zakładkę konfiguracji wczytywania i~obliczeń,
-    \item \textbf{Edition settings} -- wyświetla w panelu bocznym zakładkę ręcznej edycji współrzędnych,
-    \item \textbf{View settings} -- wyświetla w panelu bocznym zakładkę ustawień wyświetlania.
+    \item \textbf{Ustawienia grafu} -- wyświetla zakładkę konfiguracji wczytywania i~obliczeń,
+    \item \textbf{Edycja} -- wyświetla zakładkę ręcznej edycji pozycji wierzchołków,
+    \item \textbf{Ustawienia widoku} -- wyświetla zakładkę ustawień wyświetlania i~powiększenia.
 \end{itemize}
 
-Pasek menu nie zawiera rozwijanych podmenu -- każda z~trzech opcji działa jako przycisk przełączający stan panelu bocznego.
+Pasek menu nie zawiera rozwijanych podmenu -- każda opcja działa jako przycisk przełączający stan panelu bocznego. W~danym momencie aktywna jest dokładnie jedna zakładka.
 
+% ---------------------------------------------------------------
 \subsection{Panel boczny (lewy)}
 
-Panel boczny zajmuje około 25--30\% szerokości okna i~wyświetla jedną z~trzech zakładek w~zależności od aktualnie wybranej opcji w~pasku menu. Zakładki nie są widoczne jednocześnie -- w~danym momencie aktywna jest dokładnie jedna.
+Panel boczny zajmuje około 25--30\% szerokości okna. Jego zawartość zmienia się w~zależności od wybranej opcji w~pasku menu.
 
-\subsubsection{Zakładka: Graph settings}
+\subsubsection{Zakładka: Ustawienia grafu}
+\label{sec:panel-graph}
 
-Zakładka ta służy do skonfigurowania danych wejściowych, wyboru algorytmu i~uruchomienia obliczeń. Zawiera następujące elementy, ułożone od góry do dołu:
+Zakładka służy do skonfigurowania danych wejściowych, wyboru sposobu wyznaczania pozycji i~uruchomienia procesu. Elementy ułożone od góry do dołu:
 
 \begin{enumerate}
-    \item \textbf{Plik wejściowy} -- pole tekstowe ze ścieżką do pliku oraz przycisk \textit{Browse} otwierający systemowe okno dialogowe wyboru pliku. Domyślna wartość: \texttt{input.txt}.
-    \item \textbf{Wybór algorytmu} -- dwa przyciski opcji (\textit{radio button}) umożliwiające wybór jednego z~dostępnych algorytmów:
+
+    \item \textbf{Plik wejściowy} -- pole tekstowe ze ścieżką do pliku oraz przycisk \textit{Przeglądaj} otwierający systemowe okno dialogowe wyboru pliku. Akceptowany format: plik tekstowy z~listą krawędzi (sekcja~\ref{sec:format-input}). Wartość domyślna: \texttt{input.txt}.
+
+    \item \textbf{Wybór trybu wyznaczania pozycji} -- grupa przycisków opcji (\textit{radio button}) podzielona na dwie sekcje wizualnie oddzielone separatorem:
+
+    \textit{Sekcja 1 -- Obliczanie (wywołuje silnik C):}
     \begin{itemize}
-        \item \textit{Tutte embedding} (algorytm 1, domyślny),
-        \item \textit{Spectral layout} (algorytm 2).
+        \item \textbf{Fruchterman-Reingold} -- algorytm siłowy oparty na symulacji fizyki; węzły odpychają się jak cząstki naładowane, a~krawędzie przyciągają je jak sprężyny; iteracyjne chłodzenie zapewnia równomierny i~czytelny układ (opcja domyślna),
+        \item \textbf{Triangulacja} -- algorytm geometryczny gwarantujący brak przecięć krawędzi; wierzchołki są rozmieszczane z~użyciem reguł triangulacji.
     \end{itemize}
-    \item \textbf{Katalog wyjściowy} -- pole tekstowe ze ścieżką do katalogu zapisu oraz przycisk \textit{Browse}. Domyślnie: katalog programu.
-    \item \textbf{Format zapisu} -- dwa niezależne przyciski przełączające (toggling):
+    Po wybraniu jednej z~tych opcji aktywne stają się pola \textit{Katalog wyjściowy} i~\textit{Format zapisu}, a~przycisk \textit{Wykonaj} uruchamia silnik C.
+
+    \textit{Sekcja 2 -- Wczytaj gotowy plik pozycji (pomija obliczenia):}
     \begin{itemize}
-        \item \textit{Binary (.bin)} -- włącza zapis binarny,
-        \item \textit{Text (.txt)} -- włącza zapis tekstowy.
+        \item \textbf{Plik tekstowy (.txt)} -- wczytuje plik w~formacie tekstowym (sekcja~\ref{sec:fmt-txt}); obok przycisku opcji wyświetlane jest pole ścieżki z~przyciskiem \textit{Przeglądaj},
+        \item \textbf{Plik binarny (.bin)} -- wczytuje plik w~formacie binarnym (sekcja~\ref{sec:fmt-bin}); obok przycisku opcji wyświetlane jest pole ścieżki z~przyciskiem \textit{Przeglądaj},
+        \item \textbf{Plik binarny (.bin) -- inna ścieżka} -- dodatkowa opcja wczytania drugiego pliku binarnego, przydatna przy porównywaniu wyników różnych uruchomień silnika.
     \end{itemize}
-    Możliwe jest wybranie obu formatów jednocześnie. Jeśli nie wybrano żadnego, program domyślnie zapisuje plik binarny. Nazwa pliku wyjściowego jest tworzona automatycznie jako nazwa pliku wejściowego z~dopiskiem \texttt{\_positions} (np. \texttt{graf\_positions.bin}).
-    \item \textbf{Przycisk \textit{Wykonaj}} -- uruchamia wywołanie binarki programu C z~odpowiednimi argumentami (ścieżka wejściowa, wyjściowa, wybrany algorytm, format). Po zakończeniu obliczeń panel wizualizacji wyświetla wygenerowany graf. Jeśli nie wybrano pliku wejściowego, wyświetlany jest komunikat o~błędzie.
+    Po wybraniu jednej z~opcji wczytywania pola \textit{Katalog wyjściowy} i~\textit{Format zapisu} są wyszarzone (nieaktywne). Kliknięcie przycisku \textit{Wykonaj} wczytuje wskazany plik i~wyświetla graf bez wywoływania silnika C.
+
+    \item \textbf{Katalog wyjściowy} -- pole tekstowe ze ścieżką do katalogu zapisu oraz przycisk \textit{Przeglądaj}. Aktywne tylko w~trybie obliczania. Wartość domyślna: katalog programu.
+
+    \item \textbf{Format zapisu} -- dwa niezależne pola wyboru, aktywne tylko w~trybie obliczania:
+    \begin{itemize}
+        \item \textit{Binarny (.bin)} -- włącza zapis w~formacie binarnym,
+        \item \textit{Tekstowy (.txt)} -- włącza zapis w~formacie tekstowym.
+    \end{itemize}
+    Możliwe jest zaznaczenie obu formatów jednocześnie. Jeśli nie zaznaczono żadnego, program domyślnie zapisuje plik binarny. Nazwa pliku wyjściowego tworzona jest automatycznie jako nazwa pliku wejściowego z~przyrostkiem \texttt{\_positions} (np.~\texttt{graf\_positions.bin}).
+
+    \item \textbf{Przycisk \textit{Wykonaj}} -- działanie zależy od wybranego trybu:
+    \begin{itemize}
+        \item tryb obliczania: aplikacja wywołuje silnik C z~odpowiednimi argumentami; po zakończeniu wyświetla graf i~aktualizuje pasek stanu,
+        \item tryb wczytywania: aplikacja odczytuje wskazany plik i~wyświetla graf bez wywoływania silnika C.
+    \end{itemize}
+    Jeśli wymagane pole ścieżki jest puste, wyświetlany jest komunikat o~błędzie i~żadna akcja nie jest podejmowana.
+
 \end{enumerate}
 
-\subsubsection{Zakładka: Edition settings}
+% - - - - - - - - - - - - - - - - - - - - - -
+\subsubsection{Zakładka: Edycja}
+\label{sec:panel-edit}
 
-Zakładka ta umożliwia ręczną korektę współrzędnych wybranego wierzchołka bez ponownego uruchamiania algorytmu. Zawiera:
+Zakładka umożliwia korektę pozycji wierzchołków bez ponownego uruchamiania silnika obliczeniowego. Obsługiwane są dwa niezależne mechanizmy edycji.
+
+\vspace{0.5em}
+\textbf{Edycja przyciskami kierunkowymi:}
 
 \begin{enumerate}
-    \item \textbf{Wybór wierzchołka} -- lista rozwijana (\textit{combo box}) z~identyfikatorami wszystkich wierzchołków aktualnie wczytanego grafu.
-    \item \textbf{Pola współrzędnych} -- dwa pola numeryczne:
+    \item \textbf{Wybór wierzchołka} -- lista rozwijana (\textit{combo box}) z~identyfikatorami wszystkich wierzchołków aktualnie wczytanego grafu. Aktywna dopiero po wczytaniu lub obliczeniu pozycji.
+    \item \textbf{Krok przesunięcia} -- pole numeryczne określające, o~ile jednostek przesuwa się wierzchołek przy jednym kliknięciu przycisku. Wartość domyślna: \texttt{1.0}.
+    \item \textbf{Przyciski kierunkowe} -- cztery przyciski ułożone w~kształt krzyża:
     \begin{itemize}
-        \item \textit{X} -- aktualna współrzędna $x$ wybranego wierzchołka,
-        \item \textit{Y} -- aktualna współrzędna $y$ wybranego wierzchołka.
+        \item \textbf{$\uparrow$ Góra} -- przesuwa wybrany wierzchołek w~górę o~wartość kroku,
+        \item \textbf{$\downarrow$ Dół} -- przesuwa wybrany wierzchołek w~dół o~wartość kroku,
+        \item \textbf{$\leftarrow$ Lewo} -- przesuwa wybrany wierzchołek w~lewo o~wartość kroku,
+        \item \textbf{$\rightarrow$ Prawo} -- przesuwa wybrany wierzchołek w~prawo o~wartość kroku.
     \end{itemize}
-    Po wybraniu wierzchołka z~listy pola są wypełniane jego bieżącymi współrzędnymi.
-    \item \textbf{Przycisk \textit{Zatwierdź}} -- zapisuje zmodyfikowane współrzędne do pliku wyjściowego i~odświeża panel wizualizacji. Algorytm nie jest uruchamiany ponownie -- zmieniona jest wyłącznie pozycja danego wierzchołka.
+    Każde kliknięcie natychmiast odświeża panel wizualizacji.
+    \item \textbf{Przycisk \textit{Zatwierdź do pliku}} -- zapisuje bieżący stan wszystkich współrzędnych do pliku wyjściowego. Silnik C nie jest uruchamiany ponownie.
 \end{enumerate}
 
-Przycisk \textit{Zatwierdź} jest nieaktywny dopóki nie wybrano żadnego wierzchołka z~listy.
+Przyciski kierunkowe i~\textit{Zatwierdź do pliku} są nieaktywne dopóki nie wybrano wierzchołka z~listy.
 
-\subsubsection{Zakładka: View settings}
+\vspace{0.5em}
+\textbf{Edycja metodą przeciągnij i~upuść (\textit{drag \& drop}):}
 
-Zakładka ta steruje sposobem wyświetlania grafu w~panelu wizualizacji. Zawiera:
+Mechanizm dostępny bezpośrednio w~panelu wizualizacji, niezależnie od aktywnej zakładki. Realizowany przez implementację interfejsów \texttt{MouseListener} i~\texttt{MouseMotionListener} biblioteki Swing:
+
+\begin{itemize}
+    \item \texttt{mousePressed} -- kliknięcie i~przytrzymanie na wierzchołku zaznacza go i~rozpoczyna tryb przeciągania,
+    \item \texttt{mouseDragged} -- wierzchołek podąża za kursorem; panel wizualizacji odświeżany jest na bieżąco,
+    \item \texttt{mouseReleased} -- zwolnienie przycisku kończy przeciąganie; nowe współrzędne są zapisywane do pliku wyjściowego i~synchronizowane z~listą w~zakładce \textit{Edycja}.
+\end{itemize}
+
+Podczas przeciągania wierzchołek jest wizualnie wyróżniony. Kliknięcie w~obszar poza wierzchołkiem nie wywołuje żadnej akcji.
+
+% - - - - - - - - - - - - - - - - - - - - - -
+\subsubsection{Zakładka: Ustawienia widoku}
+
+Zakładka steruje sposobem wyświetlania grafu. Wszystkie zmiany są natychmiastowe.
 
 \begin{enumerate}
-    \item \textbf{Pokaż identyfikatory wierzchołków} -- pole wyboru (\textit{check box}); domyślnie włączone. Gdy aktywne, przy każdym wierzchołku wyświetlana jest jego numeryczna etykieta.
+    \item \textbf{Pokaż identyfikatory wierzchołków} -- pole wyboru; domyślnie włączone. Gdy aktywne, przy każdym wierzchołku wyświetlana jest jego etykieta.
     \item \textbf{Pokaż wagi krawędzi} -- pole wyboru; domyślnie wyłączone. Gdy aktywne, przy każdej krawędzi wyświetlana jest jej waga.
-    \item \textbf{Zoom (perspektywa)} -- suwak (\textit{slider}) zmieniający skalę widoku w~zakresie 50\%--300\%. Obok suwaka wyświetlana jest bieżąca wartość procentowa. Dodatkowe przyciski \textit{Reset zoom} i~\textit{Wyśrodkuj} przywracają domyślną skalę i~pozycję widoku.
+    \item \textbf{Powiększenie} -- suwak zmieniający skalę widoku w~zakresie 50\%--300\%. Obok suwaka wyświetlana jest bieżąca wartość procentowa.
+    \item \textbf{Przycisk \textit{Resetuj zoom}} -- przywraca skalę 100\%.
+    \item \textbf{Przycisk \textit{Wyśrodkuj}} -- wyśrodkowuje graf w~panelu wizualizacji przy bieżącej skali.
 \end{enumerate}
 
-Wszystkie zmiany w~tej zakładce są natychmiastowe -- panel wizualizacji odświeża się bez konieczności ponownego uruchamiania obliczeń.
-
+% ---------------------------------------------------------------
 \subsection{Panel wizualizacji (prawy)}
 
-Prawy obszar okna wypełnia niestandardowy komponent Swing (\texttt{GraphPanel}) implementujący własną metodę rysowania. Po uruchomieniu aplikacji obszar ten jest pusty (czarne tło). Graf pojawia się dopiero po kliknięciu przycisku \textit{Wykonaj} w~zakładce \textit{Graph settings}.
+Prawy obszar okna wypełnia niestandardowy komponent Swing (\texttt{PanelGrafu}) z~własną implementacją metody \texttt{paintComponent()}. Po uruchomieniu aplikacji obszar ma czarne tło i~jest pusty -- graf pojawia się dopiero po kliknięciu przycisku \textit{Wykonaj}.
 
 Komponent rysuje:
 \begin{itemize}
     \item krawędzie grafu jako odcinki proste łączące odpowiednie wierzchołki,
-    \item wierzchołki jako wypełnione okręgi z~opcjonalnymi etykietami identyfikatorów,
-    \item opcjonalne etykiety wag krawędzi, gdy włączona jest odpowiednia opcja w~zakładce \textit{View settings}.
+    \item wierzchołki jako wypełnione okręgi; wierzchołek zaznaczony (podczas edycji lub przeciągania) jest wyróżniony innym kolorem,
+    \item opcjonalne etykiety identyfikatorów wierzchołków,
+    \item opcjonalne etykiety wag krawędzi.
 \end{itemize}
 
-Współrzędne wierzchołków są automatycznie skalowane do aktualnego rozmiaru komponentu. Komponent reaguje na zmianę rozmiaru okna.
+Współrzędne wierzchołków są automatycznie skalowane do rozmiaru komponentu z~uwzględnieniem bieżącego poziomu powiększenia. Komponent obsługuje zdarzenia myszy realizujące mechanizm przeciągnij i~upuść (sekcja~\ref{sec:panel-edit}).
 
 \subsection{Pasek stanu}
 
-Na dole okna wyświetlany jest jednowierszowy pasek stanu zawierający:
+Jednowierszowy pasek na dole okna wyświetla:
 \begin{itemize}
-    \item wskaźnik aktualnego stanu programu (np. \textit{Gotowy}, \textit{Obliczanie\ldots}),
+    \item aktualny stan programu (np.~\textit{Gotowy}, \textit{Obliczanie\ldots}, \textit{Wczytywanie pliku\ldots}),
     \item liczbę wierzchołków i~krawędzi aktualnie wczytanego grafu,
-    \item nazwę ostatnio użytego algorytmu.
+    \item nazwę ostatnio użytego algorytmu lub trybu wczytywania.
 \end{itemize}
 
 % ---------------------------------------------------------------
-\section{Formaty danych wejściowych}
+\section{Formaty danych}
 
-\subsection{Plik z opisem grafu (lista krawędzi)}
-\label{sec:input-graph}
+Aplikacja korzysta z~formatów danych zdefiniowanych przez silnik obliczeniowy (program C autorstwa Vyshni i~Udavichenki). Poniżej opisano każdy z~nich.
 
-Aplikacja akceptuje plik tekstowy z listą krawędzi w tym samym formacie, który obsługuje program w języku C. Każda linia pliku reprezentuje jedną krawędź:
+\subsection{Plik wejściowy -- lista krawędzi}
+\label{sec:format-input}
+
+Plik tekstowy z~listą krawędzi grafu. Każda linia reprezentuje jedną krawędź:
 
 \begin{lstlisting}
-<nazwa_krawędzi> <wierzchołek_A> <wierzchołek_B> <waga_krawędzi>
+<nazwa_krawedzi> <wierzcholek_A> <wierzcholek_B> <waga_krawedzi>
 \end{lstlisting}
 
 \textbf{Przykład:}
@@ -181,168 +234,157 @@ DB   4  2  1.407
 
 Gdzie:
 \begin{itemize}
-    \item \texttt{nazwa\_krawędzi} -- dowolny ciąg znaków (etykieta krawędzi),
-    \item \texttt{wierzchołek\_A}, \texttt{wierzchołek\_B} -- dodatnie liczby całkowite identyfikujące wierzchołki,
-    \item \texttt{waga\_krawędzi} -- liczba rzeczywista (zmiennoprzecinkowa) określająca wagę krawędzi.
+    \item \texttt{nazwa\_krawedzi} -- ciąg znaków bez spacji (np.~\texttt{E1}, \texttt{AB}),
+    \item \texttt{wierzcholek\_A}, \texttt{wierzcholek\_B} -- ciągi znaków identyfikujące węzły (np.~\texttt{1}, \texttt{A}),
+    \item \texttt{waga\_krawedzi} -- liczba zmiennoprzecinkowa.
 \end{itemize}
 
-\subsection{Plik tekstowy ze współrzędnymi (\texttt{.txt})}
-\label{sec:input-txt}
+\subsection{Plik wyjściowy -- format tekstowy (.txt)}
+\label{sec:fmt-txt}
 
-Plik tekstowy generowany przez program C zawiera w pierwszej linii liczbę wierzchołków, a w kolejnych liniach identyfikator wierzchołka oraz jego współrzędne:
+Plik zawiera listę węzłów z~obliczonymi współrzędnymi. Brak nagłówka z~liczbą wierzchołków. Każda linia to jeden wierzchołek:
 
 \begin{lstlisting}
-<liczba_wierzchołków>
-<wierzchołek> <współrzędna_x> <współrzędna_y>
-...
+<wierzcholek> <wspolrzedna_x> <wspolrzedna_y>
 \end{lstlisting}
+
+Współrzędne zapisywane są w~formacie \texttt{\%.2f} (dwa miejsca po przecinku).
 
 \textbf{Przykład:}
 \begin{lstlisting}
-4
-1 0.0 0.0
-2 1.0 0.0
-3 1.0 1.0
-4 0.0 1.0
+1 0.00 0.00
+2 1.00 0.00
+3 1.00 1.00
+4 0.00 1.00
 \end{lstlisting}
 
-\subsection{Plik binarny ze współrzędnymi (\texttt{.bin})}
-\label{sec:input-bin}
+\subsection{Plik wyjściowy -- format binarny (.bin)}
+\label{sec:fmt-bin}
 
-Plik binarny generowany przez program C ma następującą strukturę:
+Plik binarny bez nagłówka. Rekordy wierzchołków następują bezpośrednio po sobie do końca pliku. Każdy rekord ma zmienną długość:
 
 \begin{itemize}
-    \item \textbf{4 bajty} -- liczba wierzchołków (typ \texttt{int}, format little-endian),
-    \item dla każdego wierzchołka (20 bajtów łącznie):
-    \begin{itemize}
-        \item \textbf{4 bajty} -- identyfikator wierzchołka (typ \texttt{int}, little-endian),
-        \item \textbf{8 bajtów} -- współrzędna $x$ (typ \texttt{double}, IEEE 754),
-        \item \textbf{8 bajtów} -- współrzędna $y$ (typ \texttt{double}, IEEE 754).
-    \end{itemize}
+    \item \textbf{1 bajt} -- długość nazwy wierzchołka (\texttt{unsigned char}),
+    \item \textbf{$n$ bajtów} -- nazwa wierzchołka (ciąg ASCII, bez znaku końca linii; $n$ to wartość poprzedniego bajtu),
+    \item \textbf{8 bajtów} -- współrzędna $x$ (\texttt{double}, IEEE 754),
+    \item \textbf{8 bajtów} -- współrzędna $y$ (\texttt{double}, IEEE 754).
 \end{itemize}
 
-\textbf{Przykład binarny} (dla wierzchołków 1--4 z~współrzędnymi $(0.0,\,0.0),\,(1.0,\,0.0),\,(1.0,\,1.0),\,(0.0,\,1.0)$):
+Aplikacja Java odczytuje plik do końca strumienia, tworząc po jednym rekordzie wierzchołka na iterację.
 
+\textbf{Przykład} (wierzchołek o~nazwie \texttt{"1"} i~współrzędnych $(0.0,\;0.0)$):
 \begin{lstlisting}
-[ 04 00 00 00 ]
-[ 01 00 00 00 ][ 00 00 00 00 00 00 00 00 ][ 00 00 00 00 00 00 00 00 ]
-[ 02 00 00 00 ][ 00 00 00 00 00 00 F0 3F ][ 00 00 00 00 00 00 00 00 ]
-[ 03 00 00 00 ][ 00 00 00 00 00 00 F0 3F ][ 00 00 00 00 00 00 F0 3F ]
-[ 04 00 00 00 ][ 00 00 00 00 00 00 00 00 ][ 00 00 00 00 00 00 F0 3F ]
+[ 01 ][ 31 ][ 00 00 00 00 00 00 00 00 ][ 00 00 00 00 00 00 00 00 ]
 \end{lstlisting}
+Gdzie \texttt{01} to długość nazwy, \texttt{31} to kod ASCII znaku \texttt{'1'}, a~oba bloki 8-bajtowe to wartość \texttt{0.0} w~formacie IEEE 754.
 
 % ---------------------------------------------------------------
-\section{Formaty danych wyjściowych}
-
-Aplikacja zapisuje wyniki w tych samych formatach, które generuje program w języku C, zapewniając pełną kompatybilność między oboma aplikacjami.
-
-\subsection{Format tekstowy (\texttt{.txt})}
-
-Zapis analogiczny do opisanego w sekcji~\ref{sec:input-txt}:
-
-\begin{lstlisting}
-<liczba_wierzchołków>
-<wierzchołek> <współrzędna_x> <współrzędna_y>
-...
-\end{lstlisting}
-
-\subsection{Format binarny (\texttt{.bin})}
-
-Zapis analogiczny do opisanego w sekcji~\ref{sec:input-bin} -- ta sama struktura bajtowa, gwarantująca możliwość ponownego wczytania pliku przez program C lub inną instancję aplikacji Java.
-
-% ---------------------------------------------------------------
-\section{Dostępne algorytmy}
+\section{Dostępne algorytmy silnika obliczeniowego}
 \label{sec:algorithms}
 
-Aplikacja udostępnia dwa algorytmy wyznaczania współrzędnych wierzchołków. Algorytm wybiera się z~listy rozwijanej w panelu narzędziowym.
+Silnik obliczeniowy udostępnia dwa algorytmy wybierane flagą \texttt{-a} przy wywołaniu:
 
 \begin{center}
-\begin{tabular}{>{\ttfamily}c l}
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{>{\raggedright\arraybackslash}p{4cm} >{\raggedright\arraybackslash}p{9.5cm}}
 \toprule
-\textbf{Numer / nazwa} & \textbf{Opis} \\
+\textbf{Nazwa algorytmu} & \textbf{Opis} \\
 \midrule
-1 -- Tutte embedding & Metoda oparta na twierdzeniu Tutte'a o sprężynach; \\
-                     & wierzchołki zewnętrzne (cykl) są ufiksowane, \\
-                     & pozostałe wyznaczane przez rozwiązanie układu równań liniowych. \\
+\texttt{fruchterman} & Algorytm siłowy (Fruchterman-Reingold). Symulacja fizyczna: węzły odpychają się jak cząstki naładowane, krawędzie przyciągają je jak sprężyny. Iteracyjne chłodzenie zapewnia równomierny i~czytelny układ. Algorytm domyślny. \\
 \addlinespace
-2 -- Spectral layout & Rozmieszczenie wierzchołków na podstawie \\
-                     & wektorów własnych macierzy Laplace'a grafu. \\
+\texttt{triangulation} & Algorytm geometryczny. Zapobiega krzyżowaniu się krawędzi przez precyzyjne rozmieszczanie wierzchołków z~użyciem reguł triangulacji. Graf musi być planarny; w~przeciwnym razie silnik zgłasza błąd. \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\vspace{1em}
-Podanie nieprawidłowego wyboru (np. poza zakresem listy) jest niemożliwe za pośrednictwem interfejsu graficznego -- lista rozwijana ogranicza dostępne opcje do wartości obsługiwanych przez program.
-
 % ---------------------------------------------------------------
 \section{Przykładowe scenariusze użycia}
 
-\subsection{Wczytanie grafu i obliczenie układu}
+\subsection{Obliczenie układu i wyświetlenie grafu}
 
 \begin{enumerate}
-    \item Uruchom aplikację. Panel wizualizacji jest pusty.
-    \item W pasku menu kliknij \textbf{Graph settings} (aktywne domyślnie).
-    \item W polu \textit{Plik wejściowy} kliknij \textit{Browse} i~wskaż plik z~listą krawędzi (np.~\texttt{graf.txt}).
-    \item Wybierz algorytm przy użyciu przycisków opcji (np. \textit{Tutte embedding}).
-    \item Opcjonalnie: kliknij \textit{Browse} przy katalogu wyjściowym, aby wskazać miejsce zapisu. Domyślnie wyniki trafiają do katalogu programu pod nazwą \texttt{graf\_positions.bin}.
-    \item Wybierz format zapisu -- \textit{Binary (.bin)}, \textit{Text (.txt)} lub oba.
-    \item Kliknij przycisk \textbf{Wykonaj}. Aplikacja wywołuje binarny program C z~odpowiednimi argumentami. Po zakończeniu obliczeń panel wizualizacji wyświetla graf.
+    \item Uruchom aplikację. Panel wizualizacji jest pusty (czarne tło).
+    \item W~pasku menu kliknij \textbf{Ustawienia grafu} (aktywne domyślnie).
+    \item W~polu \textit{Plik wejściowy} kliknij \textit{Przeglądaj} i~wskaż plik z~listą krawędzi (np.~\texttt{graf.txt}).
+    \item Wybierz algorytm: \textit{Fruchterman-Reingold} lub \textit{Triangulacja}.
+    \item Opcjonalnie wskaż katalog wyjściowy i~format zapisu.
+    \item Kliknij \textbf{Wykonaj}. Aplikacja wywołuje silnik C z~odpowiednimi argumentami. Po zakończeniu obliczeń panel wizualizacji wyświetla graf.
 \end{enumerate}
 
-\subsection{Ręczna edycja pozycji wierzchołka}
+\subsection{Wczytanie gotowego pliku pozycji}
 
 \begin{enumerate}
-    \item Po wyświetleniu grafu kliknij \textbf{Edition settings} w~pasku menu.
-    \item Z~listy rozwijanej wybierz identyfikator wierzchołka do edycji. Pola \textit{X} i~\textit{Y} wypełniają się bieżącymi współrzędnymi.
-    \item Zmień wartości w~polach \textit{X} i/lub \textit{Y}.
-    \item Kliknij \textbf{Zatwierdź}. Współrzędna zostaje zaktualizowana w~pliku wyjściowym, a~panel wizualizacji odświeża widok. Algorytm nie jest uruchamiany ponownie.
+    \item W~zakładce \textit{Ustawienia grafu} wybierz opcję \textit{Plik tekstowy (.txt)} lub \textit{Plik binarny (.bin)} w~sekcji \textit{Wczytaj gotowy plik pozycji}.
+    \item W~polu ścieżki kliknij \textit{Przeglądaj} i~wskaż plik pozycji.
+    \item Kliknij \textbf{Wykonaj}. Aplikacja odczytuje plik i~wyświetla graf. Silnik C nie jest wywoływany.
+\end{enumerate}
+
+\subsection{Edycja pozycji wierzchołka przyciskami kierunkowymi}
+
+\begin{enumerate}
+    \item Po wyświetleniu grafu kliknij \textbf{Edycja} w~pasku menu.
+    \item Z~listy rozwijanej wybierz identyfikator wierzchołka.
+    \item Ustaw żądany krok przesunięcia w~polu \textit{Krok przesunięcia}.
+    \item Klikaj przyciski $\uparrow\downarrow\leftarrow\rightarrow$, aby przesuwać wierzchołek. Panel wizualizacji odświeża się po każdym kliknięciu.
+    \item Kliknij \textbf{Zatwierdź do pliku}, aby zapisać nowe współrzędne.
+\end{enumerate}
+
+\subsection{Edycja pozycji wierzchołka przez przeciągnij i upuść}
+
+\begin{enumerate}
+    \item Po wyświetleniu grafu kliknij i~przytrzymaj przycisk myszy na wybranym wierzchołku w~panelu wizualizacji.
+    \item Przeciągnij wierzchołek w~nowe miejsce -- przesuwa się on na bieżąco wraz z~kursorem.
+    \item Zwolnij przycisk myszy. Nowe współrzędne zostają automatycznie zapisane do pliku wyjściowego.
 \end{enumerate}
 
 \subsection{Zmiana ustawień wyświetlania}
 
 \begin{enumerate}
-    \item Kliknij \textbf{View settings} w~pasku menu.
-    \item Włącz lub wyłącz \textit{Pokaż identyfikatory wierzchołków} oraz \textit{Pokaż wagi krawędzi} przy pomocy pól wyboru. Zmiany są widoczne natychmiast.
-    \item Przesuń suwak \textit{Zoom}, aby przybliżyć lub oddalić widok. Bieżąca skala wyświetlana jest obok suwaka.
-    \item Kliknij \textit{Wyśrodkuj}, aby wyśrodkować graf w~panelu wizualizacji, lub \textit{Reset zoom}, aby przywrócić skalę 100\%.
+    \item Kliknij \textbf{Ustawienia widoku} w~pasku menu.
+    \item Włącz lub wyłącz \textit{Pokaż identyfikatory wierzchołków} oraz \textit{Pokaż wagi krawędzi}. Zmiany widoczne są natychmiast.
+    \item Przesuń suwak \textit{Powiększenie}, aby zmienić skalę widoku.
+    \item Kliknij \textit{Wyśrodkuj} lub \textit{Resetuj zoom} wedle potrzeby.
 \end{enumerate}
 
 % ---------------------------------------------------------------
 \section{Sytuacje wyjątkowe}
 
-Poniżej opisano sytuacje wyjątkowe obsługiwane przez aplikację. Wszystkie komunikaty o błędach wyświetlane są w~oknie dialogowym (JOptionPane) bezpośrednio w interfejsie graficznym, chyba że zaznaczono inaczej.
+Wszystkie komunikaty o~błędach wyświetlane są w~oknie dialogowym (\texttt{JOptionPane}). Aplikacja pozostaje uruchomiona we wszystkich poniższych przypadkach -- wczytany graf i~obliczone współrzędne nie są tracone.
 
 \vspace{0.5em}
-\begin{longtable}{>{\raggedright\arraybackslash}p{4.5cm} >{\raggedright\arraybackslash}p{5.5cm} >{\centering\arraybackslash}p{3cm}}
+\begin{longtable}{>{\raggedright\arraybackslash}p{5.5cm} >{\raggedright\arraybackslash}p{7.5cm}}
 \toprule
-\textbf{Sytuacja} & \textbf{Komunikat} & \textbf{Kontynuacja działania} \\
+\textbf{Sytuacja} & \textbf{Komunikat} \\
 \midrule
 \endhead
-Nie wybrano pliku w oknie dialogowym & \textit{(brak komunikatu -- okno zamknięte przez użytkownika)} & Tak \\
+Nie wybrano pliku w~oknie dialogowym & \textit{(brak komunikatu -- okno zamknięte przez użytkownika)} \\
 \addlinespace
-Nie można otworzyć pliku wejściowego & \texttt{Błąd: nie można otworzyć pliku: <nazwa\_pliku>} & Tak \\
+Nie podano ścieżki do pliku wejściowego & \texttt{Błąd: nie podano pliku wejściowego} \\
 \addlinespace
-Nieprawidłowy format pliku z listą krawędzi & \texttt{Błąd: nieprawidłowy format danych wejściowych w linii <nr>} & Tak \\
+Nie podano ścieżki do pliku pozycji & \texttt{Błąd: nie podano pliku pozycji do wczytania} \\
 \addlinespace
-Plik tekstowy ze współrzędnymi ma błędny format & \texttt{Błąd: plik wynikowy ma nieprawidłowy format} & Tak \\
+Nie można otworzyć pliku wejściowego & \texttt{Błąd: nie można otworzyć pliku: <nazwa>} \\
 \addlinespace
-Plik binarny jest niekompletny lub uszkodzony & \texttt{Błąd: plik binarny jest niekompletny lub uszkodzony} & Tak \\
+Nieprawidłowy format pliku z~listą krawędzi & \texttt{Błąd: nieprawidłowy format danych w~linii <nr>} \\
 \addlinespace
-Graf nie zawiera żadnych wierzchołków & \texttt{Błąd: wczytany graf jest pusty} & Tak \\
+Plik .txt ze współrzędnymi ma błędny format & \texttt{Błąd: plik pozycji ma nieprawidłowy format} \\
 \addlinespace
-Próba obliczenia układu bez wczytanego grafu & \texttt{Błąd: brak wczytanego grafu -- wczytaj graf przed obliczeniem} & Tak \\
+Plik .bin jest niekompletny lub uszkodzony & \texttt{Błąd: plik binarny jest niekompletny lub uszkodzony} \\
 \addlinespace
-Problem numeryczny podczas wykonania algorytmu Tutte & \texttt{Ostrzeżenie: problem numeryczny -- zerowy element główny. Wynik może być niedokładny.} & Tak (wynik może być niekompletny) \\
+Nie znaleziono binarnego silnika C & \texttt{Błąd: nie znaleziono silnika obliczeniowego: <ścieżka>} \\
 \addlinespace
-Algorytm Tutte nie znalazł cyklu & \texttt{Błąd: graf nie zawiera cyklu wymaganego przez algorytm Tutte} & Tak \\
+Silnik C zakończył działanie z~kodem błędu & \texttt{Błąd silnika obliczeniowego (kod: <nr>): <komunikat>} \\
 \addlinespace
-Nie można zapisać pliku wyjściowego & \texttt{Błąd: nie można zapisać pliku: <nazwa\_pliku>} & Tak \\
+Graf nie zawiera żadnych wierzchołków & \texttt{Błąd: wczytany graf jest pusty} \\
 \addlinespace
-Nieprawidłowa wartość współrzędnej w polu tekstowym & \texttt{Błąd: wprowadzono nieprawidłową wartość współrzędnej} & Tak \\
+Graf nie jest planarny (algorytm triangulacji) & \texttt{Błąd silnika: podany graf nie jest planarny} \\
+\addlinespace
+Nie można zapisać pliku wyjściowego & \texttt{Błąd: nie można zapisać pliku: <nazwa>} \\
+\addlinespace
+Nieprawidłowa wartość kroku przesunięcia & \texttt{Błąd: nieprawidłowa wartość kroku przesunięcia} \\
+\addlinespace
+Próba edycji bez wczytanego grafu & \texttt{Błąd: brak danych -- wczytaj graf przed edycją} \\
 \bottomrule
 \end{longtable}
-
-\vspace{0.5em}
-We wszystkich przypadkach zaznaczonych jako \textit{Tak} w kolumnie \textit{Kontynuacja działania} -- aplikacja pozostaje uruchomiona i~zachowuje swój dotychczasowy stan (wczytany graf i~obliczone współrzędne nie są tracone).
 
 \end{document}
