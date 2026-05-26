@@ -333,3 +333,6 @@ build
 
 # Ignore Kotlin plugin data
 .kotlin
+
+# IDE files
+.settings/
