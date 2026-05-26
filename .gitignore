@@ -336,3 +336,4 @@ build
 
 # IDE files
 .settings/
+.vscode/
