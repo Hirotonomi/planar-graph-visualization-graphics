@@ -7,10 +7,10 @@ public class Main {
     public static void main(String[] args) {
         Graph graph = new Graph();
 
-        Vertex a = new Vertex(1, 100, 100);
-        Vertex b = new Vertex(2, 500, 100);
-        Vertex c = new Vertex(3, 200, 200);
-        Vertex d = new Vertex(4, 100, 200);
+        Vertex a = new Vertex(1, 100.0f, 100.0f);
+        Vertex b = new Vertex(2, 200.0f, 100.0f);
+        Vertex c = new Vertex(3, 200.0f, 200.0f);
+        Vertex d = new Vertex(4, 100.0f, 200.0f);
 
         graph.addVertex(a);
         graph.addVertex(b);
