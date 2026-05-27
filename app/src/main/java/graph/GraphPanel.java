@@ -20,6 +20,9 @@ public class GraphPanel extends JPanel {
     private int lastMouseY = 0;
     private boolean panning = false;
 
+    private boolean showVertexDecorators = true;
+    private boolean showEdgeDecorators = true;
+
     private final int RADIUS = 12;
     private final int TEXT_OFFSET = 15;
 
@@ -131,10 +134,12 @@ public class GraphPanel extends JPanel {
             g2.setStroke(new BasicStroke(2.0f));
             g2.drawLine(x1, y1, x2, y2);
             
-            int midX = (x1+x2)/2;
-            int midY = (y1+y2)/2;
-            g2.setColor(new Color(220, 220, 230));  // Light gray text
-            g2.drawString(edge.name + " " + String.valueOf(edge.weight), midX, midY);
+            if (showEdgeDecorators) {
+                int midX = (x1+x2)/2;
+                int midY = (y1+y2)/2;
+                g2.setColor(new Color(220, 220, 230));  // Light gray text
+                g2.drawString(edge.name + " " + String.valueOf(edge.weight), midX, midY);
+            }
         }
 
         // DRAW VERTICIES
@@ -150,8 +155,10 @@ public class GraphPanel extends JPanel {
             
             g2.fillOval(x-RADIUS, y-RADIUS, RADIUS*2, RADIUS*2);
 
-            g2.setColor(new Color(250, 250, 250));  // Bright white text
-            g2.drawString(String.valueOf(v.id), x, y-TEXT_OFFSET);
+            if (showVertexDecorators) {
+                g2.setColor(new Color(250, 250, 250));  // Bright white text
+                g2.drawString(String.valueOf(v.id), x, y-TEXT_OFFSET);
+            }
         }
     }
 
@@ -167,6 +174,38 @@ public class GraphPanel extends JPanel {
         }
     }
 
+    public void setShowVertexDecorators(boolean show) {
+        showVertexDecorators = show;
+        repaint();
+    }
+
+    public void setShowEdgeDecorators(boolean show) {
+        showEdgeDecorators = show;
+        repaint();
+    }
+
+    public boolean isShowVertexDecorators() {
+        return showVertexDecorators;
+    }
+
+    public boolean isShowEdgeDecorators() {
+        return showEdgeDecorators;
+    }
+
+    public void moveVertex(int vertexId, double dx, double dy) {
+        Vertex v = graph.getVertexById(vertexId);
+        if (v != null) {
+            v.x += dx;
+            v.y += dy;
+            repaint();
+        }
+    }
+
+    public void resetView() {
+        panX = 0;
+        panY = 0;
+        repaint();
+    }
 
 
 }
