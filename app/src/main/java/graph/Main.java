@@ -1,42 +1,40 @@
 package graph;
 
 import javax.swing.*;
-import java.awt.*;
+import java.util.*;
 
 public class Main {
 
     public static void main(String[] args) {
 
-        SwingUtilities.invokeLater(() -> {
+        // temporary variables 
+        List<Vertex> vertices = new ArrayList<>();
+        List<Edge> edges = new ArrayList<>();
 
-            JFrame frame = new JFrame("Graph Viewer");
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setSize(800, 600);
+        Vertex a = new Vertex(1, 100, 100);
+        Vertex b = new Vertex(2, 200, 100);
+        Vertex c = new Vertex(3, 200, 200);
+        Vertex d = new Vertex(4, 100, 200);
 
-            JPanel panel = new JPanel() {
-                @Override
-                protected void paintComponent(Graphics g) {
-                    super.paintComponent(g);
+        vertices.add(a);
+        vertices.add(b);
+        vertices.add(c);
+        vertices.add(d);
 
-                    Graphics2D g2 = (Graphics2D) g;
+        edges.add(new Edge("AB", a, b, 1));
+        edges.add(new Edge("BC", b, c, 1));
+        edges.add(new Edge("CD", c, d, 1));
+        edges.add(new Edge("DA", d, a, 1.407));
 
-                    g2.setRenderingHint(
-                        RenderingHints.KEY_ANTIALIASING,
-                        RenderingHints.VALUE_ANTIALIAS_ON
-                    );
+        JFrame frame = new JFrame("Graph Visualization");
 
-                    g2.setColor(Color.BLACK);
-                    g2.drawOval(100, 100, 30, 30);
-                    g2.drawOval(300, 200, 30, 30);
-                    g2.drawLine(115, 115, 315, 215);
-                }
-            };
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(800, 800);
+        // uncomment when GraphPanel is implemented
+        // frame.add(new GraphPanel(vertices, edges));
+        frame.setVisible(true);
+        frame.setLocationRelativeTo(null);
 
-            panel.setBackground(Color.WHITE);
 
-            frame.setContentPane(panel); // IMPORTANT FIX
-
-            frame.setVisible(true);
-        });
     }
 }
