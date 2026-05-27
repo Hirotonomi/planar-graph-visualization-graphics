@@ -14,7 +14,7 @@
          *
          * Expected line format: <name> <fromId> <toId> <weight>
          */
-        public static List<Edge> read(String path) throws IOException {
+        public static List<Edge> readTextEdges(String path) throws IOException {
             Map<Integer, Vertex> vertexMap = new LinkedHashMap<>();
             List<Edge> edges = new ArrayList<>();
 
