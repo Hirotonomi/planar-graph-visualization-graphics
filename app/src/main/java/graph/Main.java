@@ -12,7 +12,7 @@ public class Main {
         List<Edge> edges = new ArrayList<>();
 
         Vertex a = new Vertex(1, 100, 100);
-        Vertex b = new Vertex(2, 200, 100);
+        Vertex b = new Vertex(2, 500, 100);
         Vertex c = new Vertex(3, 200, 200);
         Vertex d = new Vertex(4, 100, 200);
 
@@ -31,7 +31,7 @@ public class Main {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(800, 800);
         // uncomment when GraphPanel is implemented
-        // frame.add(new GraphPanel(vertices, edges));
+        frame.add(new GraphPanel(vertices, edges));
         frame.setVisible(true);
         frame.setLocationRelativeTo(null);
 
