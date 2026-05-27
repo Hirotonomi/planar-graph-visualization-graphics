@@ -11,10 +11,10 @@ public class Main {
         List<Vertex> vertices = new ArrayList<>();
         List<Edge> edges = new ArrayList<>();
 
-        Vertex a = new Vertex(1, 100, 100);
-        Vertex b = new Vertex(2, 200, 100);
-        Vertex c = new Vertex(3, 200, 200);
-        Vertex d = new Vertex(4, 100, 200);
+        Vertex a = new Vertex(1, 100.0f, 100.0f);
+        Vertex b = new Vertex(2, 200.0f, 100.0f);
+        Vertex c = new Vertex(3, 200.0f, 200.0f);
+        Vertex d = new Vertex(4, 100.0f, 200.0f);
 
         vertices.add(a);
         vertices.add(b);
