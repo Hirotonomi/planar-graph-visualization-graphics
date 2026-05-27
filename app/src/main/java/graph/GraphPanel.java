@@ -3,11 +3,15 @@ package graph;
 import java.util.List;
 import java.awt.*;
 import javax.swing.*;
+import java.awt.event.*;
 
 public class GraphPanel extends JPanel {
     private List<Vertex> verticies;
     private List<Edge> edges;
 
+    private double scale = 1.0;
+    
+    private Vertex draggedVertex = null;
 
     private final int RADIUS = 12;
     private final int TEXT_OFFSET = 15;
@@ -18,6 +22,57 @@ public class GraphPanel extends JPanel {
 
         setBackground(Color.black);
 
+        // ZOOMING
+        addMouseWheelListener(e -> {
+            if (e.getWheelRotation() < 0) {
+                scale *= 1.1; // Zoom in
+            } else {
+                scale /= 1.1; // Zoom out
+            }
+            revalidate();
+            repaint();
+        });
+
+        // VERTEX DRAGGING
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                int x = (int) (e.getX() / scale);
+                int y = (int) (e.getY() / scale);
+
+                for (Vertex v : verticies) {
+                    double dx = x-v.x;
+                    double dy = y-v.y;
+                    double distance = Math.sqrt(dx*dx + dy*dy);
+
+                    if (distance <= RADIUS) {
+                        draggedVertex = v;
+                        break;
+                    }
+                }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                draggedVertex = null;
+            }
+        });
+
+        addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if (draggedVertex != null) {
+                    int x = (int) (e.getX() / scale);
+                    int y = (int) (e.getY() / scale);
+
+                    draggedVertex.x = x;
+                    draggedVertex.y = y;
+
+                    revalidate();
+                    repaint();
+                }
+            }
+        });
 
     }
 
@@ -28,6 +83,11 @@ public class GraphPanel extends JPanel {
         Graphics2D g2 = (Graphics2D) g;
 
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+
+
+        // APPLY SCALE
+        g2.scale(scale, scale);
 
         // DRAW EDGES
         for (Edge edge: edges) {
