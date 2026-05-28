@@ -5,18 +5,26 @@ import java.awt.*;
 
 public class LeftPanel extends JPanel {
 
-    private final CardLayout cardLayout = new CardLayout();
+    private final CardLayout             cardLayout        = new CardLayout();
+    private final GraphInteractionPanel  interactionPanel;
 
     public LeftPanel(Graph graph, GraphPanel graphPanel, Footer footer) {
         setLayout(cardLayout);
         setPreferredSize(new Dimension(270, 0));
-        setBackground(new Color(20, 20, 30));
+        setBackground(GraphSettingsCard.BG);
 
-        add(new GraphSettingsCard(graph, graphPanel, footer), "graph");
-        // add(new GraphInteractionCard(graph, graphPanel, footer),          "edit");
+        interactionPanel = new GraphInteractionPanel(
+                graph, graphPanel, footer, this);
+
+        add(new GraphSettingsCard(graph, graphPanel, footer, this), "settings");
+        add(interactionPanel, "interaction");
     }
 
     public void showCard(String name) {
         cardLayout.show(this, name);
+    }
+
+    public GraphInteractionPanel getInteractionPanel() {
+        return interactionPanel;
     }
 }
