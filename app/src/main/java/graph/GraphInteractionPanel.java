@@ -3,83 +3,82 @@ package graph;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.Collection;
 
 import static graph.GraphSettingsCard.*;
 
-/**
- * Mock version of GraphInteractionPanel.
- * <p>
- * Provides the same UI layout and user interactions, but all actual graph
- * operations are replaced with dummy actions that only update the Footer.
- * The back button still switches to the settings panel.
- */
 public class GraphInteractionPanel extends JPanel {
 
-    private final Footer    footer;
-    private final LeftPanel leftPanel;
+    private final Graph      graph;
+    private final GraphPanel graphPanel;
+    private final Footer     footer;
+    private final LeftPanel  leftPanel;
 
-    private String inputFilePath = "";   // stored but not used (mock)
+    private String inputFilePath = "";   // set by activate()
 
-    // Constructor signature unchanged – graph and graphPanel are ignored
     public GraphInteractionPanel(Graph graph, GraphPanel graphPanel,
                                  Footer footer, LeftPanel leftPanel) {
-        this.footer    = footer;
-        this.leftPanel = leftPanel;
+        this.graph      = graph;
+        this.graphPanel = graphPanel;
+        this.footer     = footer;
+        this.leftPanel  = leftPanel;
 
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBackground(BG);
         setBorder(new EmptyBorder(12, 12, 12, 12));
 
-        // ── display toggles (mock – only updates footer) ─────────────
+        // ── display toggles ───────────────────────────────────────────
         add(sectionLabel("Wyświetlanie"));
 
         JCheckBox showIDs = styledCheck("Identyfikatory wierzchołków");
         showIDs.setSelected(true);
         showIDs.addActionListener(e ->
-            footer.setStatus("Mock: wyświetlanie identyfikatorów = " + showIDs.isSelected())
-        );
+            graphPanel.setShowVertexDecorators(showIDs.isSelected()));
         add(showIDs);
         add(vgap(4));
 
         JCheckBox showWeights = styledCheck("Wagi krawędzi");
         showWeights.setSelected(true);
         showWeights.addActionListener(e ->
-            footer.setStatus("Mock: wyświetlanie wag = " + showWeights.isSelected())
-        );
+            graphPanel.setShowEdgeDecorators(showWeights.isSelected()));
         add(showWeights);
         add(vgap(14));
 
-        // ── view controls (mock – no actual zoom/center) ─────────────
+        // ── view controls ─────────────────────────────────────────────
         add(sectionLabel("Widok"));
 
         JButton resetZoomBtn = styledButton("Resetuj zoom");
         resetZoomBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
-        resetZoomBtn.addActionListener(e ->
-            footer.setStatus("Mock: zoom zresetowany (brak rzeczywistej akcji)")
-        );
+        resetZoomBtn.addActionListener(e -> {
+            graphPanel.setZoom(1.0);
+            footer.setStatus("Zoom zresetowany");
+        });
         add(resetZoomBtn);
         add(vgap(6));
 
         JButton centerBtn = styledButton("Wyśrodkuj widok");
         centerBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
-        centerBtn.addActionListener(e ->
-            footer.setStatus("Mock: widok wyśrodkowany (brak rzeczywistej akcji)")
-        );
+        centerBtn.addActionListener(e -> {
+            graphPanel.resetView();
+            footer.setStatus("Widok wyśrodkowany");
+        });
         add(centerBtn);
         add(vgap(14));
 
-        // ── export (mock – no file I/O) ──────────────────────────────
+        // ── save ──────────────────────────────────────────────────────
         add(sectionLabel("Eksport"));
 
         JButton saveBtn = styledButton("Zapisz zmiany pozycji");
         saveBtn.setBackground(new Color(30, 90, 60));
         saveBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
-        saveBtn.addActionListener(e -> mockSavePositions());
+        saveBtn.addActionListener(e -> savePositions());
         add(saveBtn);
 
         add(Box.createVerticalGlue());
 
-        // ── back button (switches to settings card, same as original) ─
+        // ── back ──────────────────────────────────────────────────────
         JSeparator sep = new JSeparator();
         sep.setForeground(new Color(48, 48, 72));
         sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 10));
@@ -92,30 +91,38 @@ public class GraphInteractionPanel extends JPanel {
         add(backBtn);
     }
 
-    /**
-     * Called by GraphSettingsCard right before switching to this panel.
-     * In the mock, it only stores the path and updates the footer.
-     */
+    /** Called by GraphSettingsCard right before switching to this panel. */
     public void activate(String inputFilePath) {
         this.inputFilePath = inputFilePath;
-        footer.setStatus("Mock: aktywowano panel interakcji dla " + inputFilePath);
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // Mock save – no real file writing, only UI feedback
+    // Save positions
     // ─────────────────────────────────────────────────────────────────
-    private void mockSavePositions() {
+
+    private void savePositions() {
         if (inputFilePath.isEmpty()) {
             JOptionPane.showMessageDialog(this,
-                "Brak wczytanego grafu (mock).", "Błąd", JOptionPane.ERROR_MESSAGE);
+                "Brak wczytanego grafu.", "Błąd", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        // Simulate a successful save
-        footer.setStatus("Mock: zapisano pozycje (żadne pliki nie zostały zmodyfikowane)");
-        JOptionPane.showMessageDialog(this,
-            "Mock: pozycje zostałyby zapisane.\n" +
-            "Plik wejściowy: " + inputFilePath,
-            "Sukces (mock)", JOptionPane.INFORMATION_MESSAGE);
+        File   inputFile = new File(inputFilePath);
+        String baseName  = inputFile.getName().replaceFirst("[.][^.]+$", "");
+        File   outFile   = new File(inputFile.getParentFile(),
+                                    baseName + "_newPositions.txt");
+
+        try {
+            Collection<Vertex> vertices = graph.getVertices();
+            GraphFileReader.writeTextOutput(vertices, outFile.getAbsolutePath());
+            footer.setStatus("Zapisano: " + outFile.getName());
+            JOptionPane.showMessageDialog(this,
+                "Pozycje zapisane do:\n" + outFile.getAbsolutePath(),
+                "Sukces", JOptionPane.INFORMATION_MESSAGE);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this,
+                "Błąd zapisu:\n" + ex.getMessage(),
+                "Błąd", JOptionPane.ERROR_MESSAGE);
+        }
     }
 }
