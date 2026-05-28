@@ -134,21 +134,13 @@ import java.util.*;
             List<Vertex> list = new ArrayList<>();
             File file = new File(path);
             if (!file.exists()) return list;
-
-            // Wczytujemy zawartość całego pliku do tablicy bajtów
             byte[] allBytes = Files.readAllBytes(file.toPath());
-            
-            // Wrapujemy w ByteBuffer i ustawiamy porządek bajtów silnika (Little-Endian)
             ByteBuffer buffer = ByteBuffer.wrap(allBytes).order(ByteOrder.LITTLE_ENDIAN);
-
-            // Każdy rekord wierzchołka zajmuje dokładnie 20 bajtów (8 + 8 + 4)
             while (buffer.remaining() >= 20) {
                 int id = buffer.getInt();
                 double x = buffer.getDouble();
                 double y = buffer.getDouble();
                 
-
-                // Dodajemy wierzchołek, rzutując współrzędne double na int (zgodnie z konstruktorem Twojej klasy Vertex)
                 list.add(new Vertex(id, x, y));
             }
 
