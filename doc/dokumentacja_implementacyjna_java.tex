@@ -1,0 +1,557 @@
+\documentclass[12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\geometry{a4paper, margin=2.5cm}
+
+\lstset{
+    language=Java,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    stringstyle=\color{red},
+    commentstyle=\color{green!60!black},
+    numbers=left,
+    numberstyle=\tiny,
+    frame=single,
+    breaklines=true,
+    showstringspaces=false
+}
+
+\title{Dokumentacja implementacyjna \\ \large Graficzny interfejs użytkownika -- wizualizacja grafów (Java Swing)}
+\author{Mateusz Kamieniecki \\ Jan Rękas}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Przegląd architektury}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Projekt Java realizuje graficzny interfejs użytkownika do wizualizacji grafów,
+współpracując z zewnętrznym silnikiem obliczeniowym napisanym w~języku C.
+Całość opiera się na bibliotece \textbf{Java Swing} i~jest zorganizowana
+w~pakiecie \texttt{graph}.
+
+Architektura oprogramowania jest zbliżona do wzorca \textbf{MVC}
+(Model--Widok--Kontroler):
+\begin{itemize}
+    \item \textbf{Model} -- klasy \texttt{Graph}, \texttt{Vertex}, \texttt{Edge}
+          przechowują strukturę grafu bez żadnej logiki prezentacji.
+    \item \textbf{Widok} -- \texttt{GraphPanel} (rysowanie grafu),
+          \texttt{Footer} (pasek statusu), klasy panelów bocznych.
+    \item \textbf{Kontroler} -- \texttt{GraphSettingsCard} i~\texttt{GraphInteractionPanel}
+          reagują na akcje użytkownika, modyfikują model i~zlecają odświeżenie widoku.
+\end{itemize}
+
+Komunikacja z~silnikiem C odbywa się przez \texttt{ProcessBuilder} --
+zewnętrzny plik \texttt{engine.exe} przyjmuje graf wejściowy i~zwraca
+obliczone pozycje wierzchołków w~formacie tekstowym lub binarnym.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Klasy modelu danych}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{graph.Vertex}
+
+Klasa modelowa reprezentująca pojedynczy wierzchołek grafu.
+
+\begin{lstlisting}
+public class Vertex {
+    public int    id;
+    public double x, y;
+}
+\end{lstlisting}
+
+\begin{description}[leftmargin=3cm, style=nextline]
+    \item[\texttt{id}] Unikalny identyfikator całkowitoliczbowy wierzchołka.
+    \item[\texttt{x}, \texttt{y}] Współrzędne ekranowe (w pikselach logicznych)
+         wykorzystywane przez \texttt{GraphPanel} do rysowania i~przeciągania.
+\end{description}
+
+Współrzędne są modyfikowane bezpośrednio przez \texttt{GraphPanel} (podczas
+przeciągania myszą) oraz przez \texttt{GraphSettingsCard} po wczytaniu pozycji
+z~pliku. Klasa \emph{nie} przechowuje listy sąsiedztwa -- relacje między
+wierzchołkami są modelowane wyłącznie przez krawędzie.
+
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{graph.Edge}
+
+Klasa modelowa reprezentująca pojedynczą krawędź grafu.
+
+\begin{lstlisting}
+public class Edge {
+    public String name;
+    public Vertex from, to;
+    public double weight;
+}
+\end{lstlisting}
+
+\begin{description}[leftmargin=3cm, style=nextline]
+    \item[\texttt{name}] Etykieta krawędzi wyświetlana na środku odcinka.
+    \item[\texttt{from}, \texttt{to}] Referencje do wierzchołków końcowych (krawędź jest nieskierowana).
+    \item[\texttt{weight}] Waga krawędzi wyświetlana obok nazwy.
+\end{description}
+
+Krawędź nie przechowuje własnych współrzędnych -- przy rysowaniu odczytuje je
+bezpośrednio z~pól \texttt{x}, \texttt{y} obiektów \texttt{Vertex}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{graph.Graph}
+
+Główna klasa modelu danych. Przechowuje listy wierzchołków i~krawędzi,
+udostępnia metody do ich dodawania, usuwania i~wyszukiwania.
+
+Kluczowe metody:
+\begin{itemize}
+    \item \texttt{addVertex(Vertex v)} -- dodaje wierzchołek do grafu.
+    \item \texttt{addEdge(Edge e)} -- dodaje krawędź do grafu.
+    \item \texttt{getVertexById(int id)} -- zwraca wierzchołek o~podanym
+          identyfikatorze lub \texttt{null}.
+    \item \texttt{getVertices()} / \texttt{getEdges()} -- zwracają listy
+          (\texttt{ArrayList}) wierzchołków i~krawędzi.
+    \item \texttt{clear()} -- usuwa wszystkie wierzchołki i~krawędzie.
+\end{itemize}
+
+Klasa jest czystym modelem danych -- nie zawiera logiki rysowania ani
+algorytmów. Listy \texttt{ArrayList} są współdzielone referencją z
+\texttt{GraphPanel}, więc każda modyfikacja modelu jest natychmiast widoczna
+po wywołaniu \texttt{repaint()}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Klasy widoku}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{graph.Bar (klasa abstrakcyjna)}
+
+Klasa bazowa dla wszystkich komponentów paskowych interfejsu (dolny pasek
+statusu, potencjalny pasek narzędziowy). Dostarcza wspólnych stałych
+stylistycznych:
+
+\begin{lstlisting}
+protected static final Color BG         = new Color(18, 18, 28);
+protected static final Color BORDER_COL = new Color(40, 40, 60);
+protected static final Color TEXT       = new Color(200, 200, 215);
+protected static final Font  FONT       = new Font("Segoe UI", Font.PLAIN, 12);
+\end{lstlisting}
+
+Konstruktor ustawia tło i~czcionkę. Klasa nie zawiera logiki biznesowej --
+służy wyłącznie ujednoliceniu wyglądu pasków.
+
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{graph.Footer (rozszerza Bar)}
+
+Dolny pasek statusu informujący użytkownika o~bieżących akcjach
+(ładowanie grafu, postęp algorytmu, błędy wejścia/wyjścia).
+
+Kluczowa metoda:
+\begin{lstlisting}
+public void setStatus(String message) {
+    SwingUtilities.invokeLater(() -> label.setText(message));
+}
+\end{lstlisting}
+
+Użycie \texttt{SwingUtilities.invokeLater()} gwarantuje bezpieczeństwo
+wątkowe -- metoda może być wywoływana z~dowolnego wątku, w~tym z~wątku
+\texttt{SwingWorker} obsługującego długotrwałe obliczenia silnika.
+
+Komponent zawiera \texttt{JLabel} z~domyślnym tekstem \emph{,,Gotowy''}.
+Górna krawędź paska jest oddzielona linią o~kolorze \texttt{BORDER\_COL}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{graph.GraphPanel (rozszerza JPanel)}
+
+Centralny komponent graficzny odpowiedzialny za wizualizację grafu
+i~interakcję myszą. Rysowanie jest zaimplementowane samodzielnie przez
+nadpisanie metody \texttt{paintComponent()}.
+
+\subsubsection{Rysowanie}
+
+\begin{lstlisting}
+@Override
+protected void paintComponent(Graphics g) {
+    super.paintComponent(g);
+    Graphics2D g2 = (Graphics2D) g;
+    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                        RenderingHints.VALUE_ANTIALIAS_ON);
+    g2.translate(panX, panY);
+    g2.scale(scale, scale);
+    // rysowanie krawędzi, następnie wierzchołków
+}
+\end{lstlisting}
+
+Transformacja \texttt{translate + scale} pozwala na płynne przesuwanie
+i~skalowanie widoku bez modyfikacji współrzędnych modelu. Wierzchołki
+rysowane są jako wypełnione okręgi (promień \texttt{RADIUS = 12} px),
+krawędzie jako odcinki z~opcjonalnym tekstem pośrodku.
+
+\subsubsection{Interakcja myszą}
+
+Panel obsługuje trzy tryby interakcji:
+\begin{itemize}
+    \item \textbf{Przeciąganie wierzchołków} (lewy przycisk myszy) --
+          po kliknięciu w~obszarze wierzchołka (\texttt{distance <= RADIUS})
+          aktualizuje \texttt{v.x}, \texttt{v.y} w~modelu i~wywołuje
+          \texttt{repaint()}.
+    \item \textbf{Przesuwanie widoku (pan)} (środkowy przycisk myszy) --
+          aktualizuje \texttt{panX}, \texttt{panY}.
+    \item \textbf{Zoom} (kółko myszy) -- mnoży lub dzieli \texttt{scale}
+          przez \texttt{1.1}.
+\end{itemize}
+
+\subsubsection{Metody publiczne}
+
+\begin{description}[leftmargin=5cm, style=nextline]
+    \item[\texttt{setZoom(double)}] Ustawia poziom powiększenia i~wywołuje
+         \texttt{repaint()}.
+    \item[\texttt{resetView()}] Zeruje przesunięcie widoku (\texttt{panX = panY = 0}).
+    \item[\texttt{fitToView()}] Automatycznie dobiera zoom i~przesunięcie tak,
+         by cały graf zmieścił się w~oknie z~80 px marginesem. Oblicza
+         \texttt{minX}, \texttt{maxX}, \texttt{minY}, \texttt{maxY} i~wyznacza
+         \texttt{scale = min(scaleX, scaleY)}, zachowując proporcje.
+    \item[\texttt{setShowVertexDecorators(boolean)}] Pokazuje lub ukrywa
+         identyfikatory wierzchołków.
+    \item[\texttt{setShowEdgeDecorators(boolean)}] Pokazuje lub ukrywa
+         etykiety i~wagi krawędzi.
+    \item[\texttt{moveVertex(int id, double dx, double dy)}] Przesuwa wierzchołek
+         o~podanym ID o~wektor $(\Delta x, \Delta y)$.
+\end{description}
+
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{graph.LeftPanel}
+
+Panel boczny działający jako kontener z~układem kartowym
+(\texttt{CardLayout}). Zarządza przełączaniem między dwoma kartami:
+\begin{itemize}
+    \item \textbf{,,settings''} -- karta \texttt{GraphSettingsCard} (wybór
+          pliku, trybu, algorytmu i~uruchomienie obliczania).
+    \item \textbf{,,interaction''} -- karta \texttt{GraphInteractionPanel}
+          (opcje wyświetlania, sterowanie widokiem, zapis pozycji).
+\end{itemize}
+
+Metody \texttt{showCard(String)} i~\texttt{getInteractionPanel()} umożliwiają
+zewnętrznym komponentom przełączanie widoku.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Klasy kontrolera}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{graph.GraphSettingsCard (rozszerza JPanel)}
+
+Karta ustawień -- pierwszy ekran widoczny po uruchomieniu. Umożliwia:
+\begin{enumerate}
+    \item Wskazanie pliku wejściowego z~listą krawędzi grafu.
+    \item Wybór trybu działania (algorytm lub wczytanie gotowych pozycji).
+    \item Uruchomienie silnika obliczeniowego lub odczyt pozycji z~pliku.
+\end{enumerate}
+
+\subsubsection{Tryby pracy}
+
+\begin{description}[leftmargin=5cm, style=nextline]
+    \item[\texttt{radioFrucht}] Algorytm Fruchtermana-Reingolda (domyślny).
+    \item[\texttt{radioTriang}] Algorytm triangulacji.
+    \item[\texttt{radioLoadTxt}] Wczytanie pozycji z~pliku \texttt{.txt}.
+    \item[\texttt{radioLoadBin}] Wczytanie pozycji z~pliku binarnego.
+\end{description}
+
+Wybór trybu dynamicznie pokazuje lub ukrywa sekcję \texttt{loadSection}
+(pole ścieżki do pliku pozycji) i~\texttt{algoSection} (wybór formatu zapisu)
+za pomocą \texttt{Runnable sync}.
+
+\subsubsection{Metoda onExecute()}
+
+Główny punkt wejścia po kliknięciu przycisku \emph{,,Wykonaj''}:
+\begin{enumerate}
+    \item Waliduje ścieżkę wejściową (niepusta, plik istnieje).
+    \item Wczytuje krawędzie przez \texttt{GraphFileReader.readTextEdges()}.
+    \item W~zależności od trybu:
+    \begin{itemize}
+        \item tryby \texttt{LoadTxt} / \texttt{LoadBin} -- wywołuje
+              \texttt{applyPositionsTxt()} lub \texttt{applyPositionsBin()},
+              następnie przełącza kartę;
+        \item tryby algorytmiczne -- wywołuje \texttt{runEngine()}.
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Metoda runEngine()}
+
+Uruchamia silnik C w~tle przy użyciu \texttt{SwingWorker}:
+
+\begin{lstlisting}
+SwingWorker<Void, String> worker = new SwingWorker<>() {
+    @Override
+    protected Void doInBackground() throws Exception {
+        Process proc = new ProcessBuilder(cmd)
+                .redirectErrorStream(true).start();
+        // odczyt stdout i aktualizacja footer przez publish()
+        int code = proc.waitFor();
+        if (code != 0) throw new IOException(...);
+        return null;
+    }
+    @Override
+    protected void done() {
+        // wczytanie wyników, przełączenie karty
+    }
+};
+worker.execute();
+\end{lstlisting}
+
+Zastosowanie \texttt{SwingWorker} zapewnia, że interfejs nie blokuje się
+podczas obliczeń. Metoda \texttt{process()} publikuje linie stdout silnika
+do \texttt{Footer}, a~\texttt{done()} wczytuje wyniki i~przełącza na kartę
+interakcji.
+
+\subsubsection{Wyszukiwanie silnika -- findEnginePath()}
+
+Metoda statyczna przeszukuje kilka kandydujących ścieżek:
+\begin{lstlisting}
+private static String findEnginePath() {
+    String[] candidates = {
+        "bin/engine/engine.exe",
+        "app/bin/engine/engine.exe",
+        "../bin/engine/engine.exe",
+    };
+    for (String c : candidates)
+        if (new File(c).exists()) return new File(c).getAbsolutePath();
+    return new File("bin/engine/engine.exe").getAbsolutePath();
+}
+\end{lstlisting}
+
+\subsubsection{Metody pomocnicze (statyczne, dostępne dla innych klas)}
+
+\begin{description}[leftmargin=4cm, style=nextline]
+    \item[\texttt{styledButton(String)}] Tworzy przycisk z~ciemnym motywem.
+    \item[\texttt{styledField()}] Tworzy pole tekstowe zgodne z~motywem.
+    \item[\texttt{styledRadio(String)}] Tworzy radio button z~motywem.
+    \item[\texttt{styledCheck(String)}] Tworzy checkbox z~motywem.
+    \item[\texttt{sectionLabel(String)}] Tworzy szary nagłówek sekcji.
+    \item[\texttt{box()}] Tworzy \texttt{JPanel} z~\texttt{BoxLayout.Y\_AXIS}.
+    \item[\texttt{vgap(int)}] Tworzy pionowy odstęp (\texttt{Box.createVerticalStrut}).
+    \item[\texttt{separator()}] Tworzy wizualną linię separatora.
+    \item[\texttt{describe(Throwable)}] Zwraca czytelny komunikat wyjątku.
+\end{description}
+
+Metody te są \texttt{static}, dzięki czemu \texttt{GraphInteractionPanel}
+importuje je statycznie i~zachowuje spójny wygląd bez duplikacji kodu.
+
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{graph.GraphInteractionPanel (rozszerza JPanel)}
+
+Karta interakcji -- aktywna po załadowaniu grafu. Zawiera trzy sekcje:
+
+\begin{description}[leftmargin=3.5cm, style=nextline]
+    \item[Wyświetlanie] Dwa checkboxy: identyfikatory wierzchołków i~wagi
+         krawędzi; każdy wywołuje odpowiednią metodę \texttt{setShow*()}
+         na \texttt{GraphPanel}.
+    \item[Widok] Trzy przyciski: \emph{Resetuj zoom}
+         (\texttt{graphPanel.setZoom(1.0)}), \emph{Wyśrodkuj widok}
+         (\texttt{graphPanel.resetView()}) oraz \emph{Dopasuj do widoku}
+         (\texttt{graphPanel.fitToView()}).
+    \item[Eksport] Przycisk \emph{Zapisz zmiany pozycji}, wywołujący
+         metodę \texttt{savePositions()}.
+\end{description}
+
+\subsubsection{Metoda activate(String inputFilePath)}
+
+Wywoływana przez \texttt{GraphSettingsCard} tuż przed przełączeniem karty.
+Zapamiętuje ścieżkę pliku wejściowego, potrzebną do generowania nazwy
+pliku wyjściowego.
+
+\subsubsection{Metoda savePositions()}
+
+Generuje nazwę pliku wyjściowego (\texttt{<baseName>\_newPositions.txt})
+w~tym samym katalogu co plik wejściowy i~zapisuje aktualne współrzędne
+wierzchołków przez \texttt{GraphFileReader.writeTextOutput()}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Klasa graph.GraphFileReader}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Klasa narzędziowa (wszystkie metody \texttt{static}) obsługująca wejście
+i~wyjście plików grafu. Oddziela logikę parsowania od kontrolera.
+
+\subsection{readTextEdges(String path)}
+
+\textbf{Format wejściowy:} każda linia zawiera
+\texttt{<nazwa> <fromId> <toId> <waga>} oddzielone białymi znakami.
+
+\begin{lstlisting}
+public static List<Edge> readTextEdges(String path) throws IOException
+\end{lstlisting}
+
+\textbf{Działanie:}
+\begin{enumerate}
+    \item Wczytuje plik linia po linii przez \texttt{BufferedReader}.
+    \item Pomija puste linie.
+    \item Waliduje, że każda linia ma co najmniej 4 tokeny; przy błędzie
+          rzuca \texttt{IOException} z~numerem linii.
+    \item Deduplikuje wierzchołki przez \texttt{LinkedHashMap<Integer, Vertex>}
+          -- ten sam wierzchołek nie jest tworzony wielokrotnie, a~referencja
+          jest współdzielona między krawędziami.
+    \item Zwraca niepustą listę krawędzi; jeśli jest pusta -- rzuca
+          \texttt{IOException}.
+\end{enumerate}
+
+\subsection{readTextVertices(String path)}
+
+\textbf{Format wejściowy:} każda linia zawiera \texttt{<id> <x> <y>}.
+
+\begin{lstlisting}
+public static List<Vertex> readTextVertices(String path) throws IOException
+\end{lstlisting}
+
+Używany do wczytywania pozycji wierzchołków z~pliku \texttt{.txt} zapisanego
+przez silnik C. Akceptuje zarówno kropkę, jak i~przecinek jako separator
+dziesiętny (\texttt{replace(',', '.')}).
+
+\subsection{writeTextOutput(Collection<Vertex> vertices, String path)}
+
+\begin{lstlisting}
+public static void writeTextOutput(Collection<Vertex> vertices, String path)
+        throws IOException
+\end{lstlisting}
+
+Zapisuje pozycje wierzchołków do pliku tekstowego w~formacie
+\texttt{\%d \%.2f \%.2f} (id, x, y) przez \texttt{PrintWriter}.
+
+\subsection{readBinaryInput(String path)}
+
+\begin{lstlisting}
+public static List<Vertex> readBinaryInput(String path) throws IOException
+\end{lstlisting}
+
+Wczytuje plik binarny wygenerowany przez silnik C. Format rekordu (20 bajtów,
+little-endian):
+
+\begin{center}
+\begin{tabular}{|c|c|c|}
+    \hline
+    \textbf{Offset} & \textbf{Typ} & \textbf{Znaczenie} \\
+    \hline
+    0 & \texttt{int} (4 B) & identyfikator wierzchołka \\
+    4 & \texttt{double} (8 B) & współrzędna $x$ \\
+    12 & \texttt{double} (8 B) & współrzędna $y$ \\
+    \hline
+\end{tabular}
+\end{center}
+
+Odczyt realizowany przez \texttt{ByteBuffer.wrap(allBytes).order(ByteOrder.LITTLE\_ENDIAN)}.
+Pętla czyta kolejne rekordy dopóki bufor ma co najmniej 20 bajtów.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Klasy pomocnicze i kontener główny}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{graph.MainFrame (rozszerza JFrame)}
+
+Kontener główny okna aplikacji.
+
+\textbf{Odpowiedzialność:}
+\begin{itemize}
+    \item Tworzenie instancji modelu (\texttt{Graph}) i~przykładowych danych
+          (wierzchołki i~krawędzie do testów).
+    \item Inicjalizacja widoków: \texttt{GraphPanel}, \texttt{Footer},
+          \texttt{LeftPanel}.
+    \item Ustawienie \texttt{BorderLayout}: \texttt{Footer} na dole,
+          \texttt{LeftPanel} po lewej, \texttt{GraphPanel} na środku.
+    \item Konfiguracja okna: tytuł, rozmiar, \texttt{EXIT\_ON\_CLOSE},
+          wyśrodkowanie na ekranie.
+\end{itemize}
+
+\textbf{Uwaga:} Zgodnie z~wymaganiami należy dodać pasek menu
+(\texttt{JMenuBar}) z~opcjami: wczytanie grafu z~pliku tekstowego i~binarnego,
+zapis wyników oraz pomoc.
+
+\subsection{graph.Main}
+
+Klasa startowa. Metoda \texttt{main} uruchamia GUI w~wątku EDT:
+
+\begin{lstlisting}
+public static void main(String[] args) {
+    SwingUtilities.invokeLater(() -> new MainFrame().setVisible(true));
+}
+\end{lstlisting}
+
+Nie zawiera logiki biznesowej.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Wątkowość}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Projekt przestrzega zasad bezpieczeństwa wątkowego Swing:
+
+\begin{itemize}
+    \item Wszystkie operacje na komponentach GUI odbywają się w~wątku EDT.
+    \item \texttt{Footer.setStatus()} używa \texttt{SwingUtilities.invokeLater()}
+          i~może być bezpiecznie wywoływana z~dowolnego wątku.
+    \item Długotrwałe operacje (uruchomienie silnika C, oczekiwanie na wyniki)
+          wykonywane są w~\texttt{SwingWorker.doInBackground()}, natomiast
+          aktualizacja interfejsu -- w~\texttt{process()} i~\texttt{done()},
+          które działają na EDT.
+    \item Bezpośrednie modyfikacje modelu (\texttt{Vertex.x}, \texttt{Vertex.y})
+          podczas przeciągania myszą odbywają się w~EDT (obsługa zdarzeń myszy).
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Spójność komponentów i obsługa błędów}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\begin{itemize}
+    \item \texttt{GraphSettingsCard.onExecute()} waliduje ścieżki przed
+          każdą operacją i~wyświetla \texttt{JOptionPane.ERROR\_MESSAGE}
+          z~opisem błędu.
+    \item Metoda \texttt{describe(Throwable)} (statyczna w~\texttt{GraphSettingsCard})
+          wyodrębnia czytelny komunikat z~wyjątku, używana w~całym pakiecie.
+    \item \texttt{GraphFileReader} rzuca \texttt{IOException} z~numerem linii
+          przy błędzie parsowania, co pozwala użytkownikowi szybko znaleźć
+          problem w~pliku wejściowym.
+    \item Po pomyślnym wczytaniu grafu panel automatycznie przełącza się na
+          kartę interakcji (\texttt{leftPanel.showCard("interaction")}),
+          zapobiegając operowaniu na pustym widoku.
+    \item Przycisk \emph{Wróć do ustawień} w~\texttt{GraphInteractionPanel}
+          zawsze umożliwia powrót bez utraty wczytanego grafu.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Integracja z silnikiem C}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Silnik obliczeniowy (\texttt{engine.exe}) jest osobnym procesem uruchamianym
+przez \texttt{ProcessBuilder}. Interfejs komunikacji:
+
+\begin{lstlisting}
+engine.exe <sciezka_grafu> -a <algorytm> -o <sciezka_wyjsciowa> [-t|-b]
+\end{lstlisting}
+
+\begin{description}[leftmargin=3cm, style=nextline]
+    \item[\texttt{-a}] Algorytm: \texttt{fruchterman} lub \texttt{triangulation}.
+    \item[\texttt{-o}] Ścieżka bazowa pliku wyjściowego (bez rozszerzenia
+         przy formacie binarnym).
+    \item[\texttt{-t}] Zapis w~formacie tekstowym (plik \texttt{.txt}).
+    \item[\texttt{-b}] Zapis w~formacie binarnym.
+\end{description}
+
+Silnik zapisuje wyniki w~podkatalogu \texttt{positions/} obok pliku grafu
+wejściowego. Po zakończeniu procesu z~kodem 0 \texttt{GraphSettingsCard}
+wczytuje wyniki i~stosuje je do modelu przez \texttt{applyPositionsTxt()}
+lub \texttt{applyPositionsBin()}.
+
+% ───────────────────────────────────────────────────────────────────────────
+
+\end{document}
