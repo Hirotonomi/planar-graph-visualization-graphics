@@ -92,8 +92,8 @@ import java.util.*;
 
                     try {
                         id = Integer.parseInt(parts[0]);
-                        x  = Double.parseDouble(parts[1]);
-                        y  = Double.parseDouble(parts[2]);
+                        x  = Double.parseDouble(parts[1].replace(',', '.'));
+                        y  = Double.parseDouble(parts[2].replace(',', '.'));
                     } catch (NumberFormatException e) {
                         throw new IOException(
                             "Nieprawidłowy format danych w linii " + lineNumber);
@@ -148,7 +148,7 @@ import java.util.*;
                 int id = buffer.getInt();
 
                 // Dodajemy wierzchołek, rzutując współrzędne double na int (zgodnie z konstruktorem Twojej klasy Vertex)
-                list.add(new Vertex(id, (int) x, (int) y));
+                list.add(new Vertex(id, x, y));
             }
 
             if (list.isEmpty()) {
