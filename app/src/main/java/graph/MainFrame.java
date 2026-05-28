@@ -25,11 +25,16 @@ public class MainFrame extends JFrame {
         graph.addEdge(new Edge("DA", d, a, 1.407));
 
         GraphPanel  graphPanel = new GraphPanel(graph);
+        Footer      footer     = new Footer();
+        LeftPanel   leftPanel  = new LeftPanel(graph, graphPanel, footer);
 
         setLayout(new BorderLayout());
+        add(footer,     BorderLayout.SOUTH);
         JPanel center = new JPanel(new BorderLayout());
+        center.add(leftPanel,  BorderLayout.WEST);
         center.add(graphPanel, BorderLayout.CENTER);
         add(center, BorderLayout.CENTER);
+        
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1200, 820);
