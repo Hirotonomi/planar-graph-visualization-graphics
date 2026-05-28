@@ -1,7 +1,4 @@
-    package graph.io;
-
-    import graph.Edge;
-    import graph.Vertex;
+    package graph;
 
     import java.io.*;
     import java.util.*;

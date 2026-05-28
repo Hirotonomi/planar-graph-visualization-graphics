@@ -1,7 +1,6 @@
-package graph.bar;
+package graph;
 
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import java.awt.*;
 
 public abstract class Bar extends JPanel {
