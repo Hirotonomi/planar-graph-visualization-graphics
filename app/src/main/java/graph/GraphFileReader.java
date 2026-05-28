@@ -1,7 +1,9 @@
     package graph;
 
     import java.io.*;
-    import java.util.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.*;
 
     public class GraphFileReader {
 
@@ -120,53 +122,60 @@
         }
 
         /**
-         * Writes vertices to a binary file.
-         * Format for each vertex:
-         * 1. Name length (1 byte, unsigned char)
-         * 2. Name (UTF-8 string)
-         * 3. Coordinate x (8 bytes, double)
-         * 4. Coordinate y (8 bytes, double)
-         */
-        public static void writeBinaryOutput(Collection<Vertex> vertices, String path) throws IOException {
-            try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(path))) {
-                for (Vertex v : vertices) {
-                    String vertexName = String.valueOf(v.id);
-                    byte[] nameBytes = vertexName.getBytes("UTF-8");
-                    
-                    dos.writeByte(nameBytes.length);
-                    dos.write(nameBytes);
-                    dos.writeDouble(v.x);
-                    dos.writeDouble(v.y);
-                }
-            }
-        }
-
-        /**
-         * Reads vertices from a binary file.
-         * Expects format: name_length (1 byte), name (UTF-8), x (double), y (double)
+         * Reads a binary position file produced by the Vyshnia/Udavichenka engine.
+         *
+         * Per-record layout:
+         *   [1 byte]   name length (unsigned)
+         *   [n bytes]  vertex name as ASCII
+         *   [8 bytes]  x coordinate — IEEE 754 double, LITTLE-ENDIAN
+         *   [8 bytes]  y coordinate — IEEE 754 double, LITTLE-ENDIAN
+         *
+         * NOTE: replaces readBinaryInput() which used DataInputStream.readDouble()
+         * (big-endian). The C engine writes little-endian on x86 — this method
+         * reads correctly.
          */
         public static List<Vertex> readBinaryInput(String path) throws IOException {
-            List<Vertex> vertices = new ArrayList<>();
+            List<Vertex> list = new ArrayList<>();
 
-            try (DataInputStream dis = new DataInputStream(new FileInputStream(path))) {
-                int nextId = 1;
-                while (dis.available() > 0) {
-                    int nameLength = dis.readUnsignedByte();
-                    byte[] nameBytes = new byte[nameLength];
-                    dis.readFully(nameBytes);
-                    
-                    double x = dis.readDouble();
-                    double y = dis.readDouble();
-                    
-                    Vertex v = new Vertex(nextId++, x, y);
-                    vertices.add(v);
+            try (FileInputStream fis = new FileInputStream(path)) {
+                byte[] buf8 = new byte[8];
+
+                while (true) {
+                    int nameLen = fis.read();
+                    if (nameLen == -1) break;                    // clean EOF
+
+                    byte[] nameBytes = new byte[nameLen];
+                    int nameRead = fis.read(nameBytes);
+                    if (nameRead != nameLen)
+                        throw new IOException("Plik binarny niekompletny (nazwa wierzchołka)");
+
+                    if (fis.read(buf8) != 8)
+                        throw new IOException("Plik binarny niekompletny (współrzędna x)");
+                    double x = ByteBuffer.wrap(buf8.clone())
+                                        .order(ByteOrder.LITTLE_ENDIAN)
+                                        .getDouble();
+
+                    if (fis.read(buf8) != 8)
+                        throw new IOException("Plik binarny niekompletny (współrzędna y)");
+                    double y = ByteBuffer.wrap(buf8.clone())
+                                        .order(ByteOrder.LITTLE_ENDIAN)
+                                        .getDouble();
+
+                    String name = new String(nameBytes, "ASCII").trim();
+                    int id;
+                    try {
+                        id = Integer.parseInt(name);
+                    } catch (NumberFormatException e) {
+                        throw new IOException("Nieprawidłowa nazwa wierzchołka w pliku binarnym: '" + name + "'");
+                    }
+
+                    list.add(new Vertex(id, (int) x, (int) y));
                 }
             }
 
-            if (vertices.isEmpty()) {
-                throw new IOException("Błąd: wczytany plik binarny jest pusty");
-            }
+            if (list.isEmpty())
+                throw new IOException("Plik binarny jest pusty lub ma nieprawidłowy format");
 
-            return vertices;
+            return list;
         }
     }

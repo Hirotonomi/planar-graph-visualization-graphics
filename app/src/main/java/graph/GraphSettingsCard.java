@@ -4,27 +4,23 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 public class GraphSettingsCard extends JPanel {
 
-    // ── shared colours / fonts (used by interaction panel too) ────────
-    static final Color BG        = new Color(20, 20, 30);
-    static final Color BG_FIELD  = new Color(32, 32, 50);
-    static final Color FG        = new Color(205, 205, 220);
-    static final Color FG_DIM    = new Color(130, 130, 155);
-    static final Font  FONT      = new Font("Segoe UI", Font.PLAIN, 13);
+    static final Color BG       = new Color(20, 20, 30);
+    static final Color BG_FIELD = new Color(32, 32, 50);
+    static final Color FG       = new Color(205, 205, 220);
+    static final Color FG_DIM   = new Color(130, 130, 155);
+    static final Font  FONT     = new Font("Segoe UI", Font.PLAIN, 13);
 
-    // ── references ────────────────────────────────────────────────────
-    private final Graph       graph;
-    private final GraphPanel  graphPanel;
-    private final Footer      footer;
-    private final LeftPanel   leftPanel;   // needed to trigger card switch
+    private final Graph      graph;
+    private final GraphPanel graphPanel;
+    private final Footer     footer;
+    private final LeftPanel  leftPanel;
 
-    // ── widgets ───────────────────────────────────────────────────────
     private final JTextField   inputPathField = styledField();
     private final JRadioButton radioFrucht    = styledRadio("Fruchterman-Reingold");
     private final JRadioButton radioTriang    = styledRadio("Triangulacja");
@@ -34,7 +30,6 @@ public class GraphSettingsCard extends JPanel {
     private final JCheckBox    checkBin       = styledCheck(".bin");
     private final JCheckBox    checkTxt       = styledCheck(".txt");
 
-    // toggled sections
     private final JPanel algoSection;
     private final JPanel loadSection;
 
@@ -49,12 +44,10 @@ public class GraphSettingsCard extends JPanel {
         setBackground(BG);
         setBorder(new EmptyBorder(12, 12, 12, 12));
 
-        // ── input graph file ──────────────────────────────────────────
         add(sectionLabel("Plik grafu (lista krawędzi)"));
         add(browseRow(inputPathField, false));
         add(vgap(12));
 
-        // ── mode radio buttons ────────────────────────────────────────
         add(sectionLabel("Tryb"));
         ButtonGroup group = new ButtonGroup();
         for (JRadioButton r : new JRadioButton[]{
@@ -72,14 +65,12 @@ public class GraphSettingsCard extends JPanel {
         add(modePanel);
         add(vgap(10));
 
-        // ── load section: shown when load mode ────────────────────────
         loadSection = box();
         loadSection.add(sectionLabel("Plik pozycji"));
         loadSection.add(browseRow(posPathField, false));
         add(loadSection);
         add(vgap(6));
 
-        // ── algo section: format checkboxes, shown when algo mode ─────
         algoSection = box();
         algoSection.add(sectionLabel(
             "Format zapisu  (folder 'positions' obok pliku grafu)"));
@@ -92,7 +83,6 @@ public class GraphSettingsCard extends JPanel {
         algoSection.add(fmtRow);
         add(algoSection);
 
-        // ── hook radio buttons to show/hide sections ──────────────────
         Runnable sync = () -> {
             boolean load = radioLoadTxt.isSelected() || radioLoadBin.isSelected();
             loadSection.setVisible(load);
@@ -105,7 +95,6 @@ public class GraphSettingsCard extends JPanel {
         radioLoadBin.addActionListener(e -> sync.run());
         sync.run();
 
-        // ── execute button ────────────────────────────────────────────
         add(Box.createVerticalGlue());
         add(vgap(12));
         JButton btn = styledButton("Wykonaj");
@@ -121,21 +110,15 @@ public class GraphSettingsCard extends JPanel {
 
     private void onExecute() {
         String inputPath = inputPathField.getText().trim();
-        if (inputPath.isEmpty()) {
-            error("Nie podano pliku grafu."); return;
-        }
-        if (!new File(inputPath).exists()) {
-            error("Plik grafu nie istnieje:\n" + inputPath); return;
-        }
+        if (inputPath.isEmpty())          { error("Nie podano pliku grafu.");           return; }
+        if (!new File(inputPath).exists()) { error("Plik grafu nie istnieje:\n" + inputPath); return; }
 
-        // 1. load edges into graph
         try {
             loadGraphFromFile(inputPath);
         } catch (IOException ex) {
-            error("Błąd wczytywania grafu:\n" + ex.getMessage()); return;
+            error("Błąd wczytywania grafu:\n" + describe(ex)); return;
         }
 
-        // 2. get / compute positions
         if (radioLoadTxt.isSelected()) {
             String posPath = posPathField.getText().trim();
             if (posPath.isEmpty()) { error("Nie podano pliku pozycji."); return; }
@@ -143,9 +126,7 @@ public class GraphSettingsCard extends JPanel {
                 applyPositionsTxt(posPath);
                 footer.setStatus("Wczytano pozycje z .txt");
                 switchToInteraction(inputPath);
-            } catch (IOException ex) {
-                error("Błąd wczytywania pozycji:\n" + ex.getMessage());
-            }
+            } catch (IOException ex) { error("Błąd wczytywania pozycji:\n" + describe(ex)); }
 
         } else if (radioLoadBin.isSelected()) {
             String posPath = posPathField.getText().trim();
@@ -154,9 +135,7 @@ public class GraphSettingsCard extends JPanel {
                 applyPositionsBin(posPath);
                 footer.setStatus("Wczytano pozycje z .bin");
                 switchToInteraction(inputPath);
-            } catch (IOException ex) {
-                error("Błąd wczytywania pozycji:\n" + ex.getMessage());
-            }
+            } catch (IOException ex) { error("Błąd wczytywania pozycji:\n" + describe(ex)); }
 
         } else {
             runEngine(inputPath);
@@ -170,14 +149,12 @@ public class GraphSettingsCard extends JPanel {
     private void loadGraphFromFile(String inputPath) throws IOException {
         List<Edge> loadedEdges = GraphFileReader.readTextEdges(inputPath);
 
-        // collect unique vertex objects (shared across edges)
         Map<Integer, Vertex> vMap = new LinkedHashMap<>();
         for (Edge e : loadedEdges) {
             vMap.put(e.from.id, e.from);
             vMap.put(e.to.id,   e.to);
         }
 
-        // clear graph in-place so GraphPanel's list references stay valid
         graph.getVertices().clear();
         graph.getEdges().clear();
         for (Vertex v : vMap.values()) graph.addVertex(v);
@@ -189,29 +166,18 @@ public class GraphSettingsCard extends JPanel {
     // ─────────────────────────────────────────────────────────────────
 
     private void applyPositionsTxt(String path) throws IOException {
-        // Uses GraphFileReader from your friend
-        List<Vertex> positions = GraphFileReader.readTextVertices(path);
-        applyToGraph(positions);
+        applyToGraph(GraphFileReader.readTextVertices(path));
     }
 
     private void applyPositionsBin(String path) throws IOException {
-        // NOTE: GraphFileReader.readBinaryInput uses big-endian DataInputStream,
-        // but the C engine writes little-endian doubles. Using a manual
-        // little-endian reader here to match the engine's actual output.
-        List<Vertex> positions = readBinLittleEndian(path);
-        applyToGraph(positions);
+        // Uses the correct little-endian reader to match C engine output.
+        applyToGraph(GraphFileReader.readBinaryInput(path));
     }
 
     private void applyToGraph(List<Vertex> positions) {
-        for (Vertex src : positions) {
-            for (Vertex dst : graph.getVertices()) {
-                if (dst.id == src.id) {
-                    dst.x = src.x;
-                    dst.y = src.y;
-                    break;
-                }
-            }
-        }
+        for (Vertex src : positions)
+            for (Vertex dst : graph.getVertices())
+                if (dst.id == src.id) { dst.x = src.x; dst.y = src.y; break; }
         graphPanel.repaint();
     }
 
@@ -223,7 +189,6 @@ public class GraphSettingsCard extends JPanel {
         if (!checkBin.isSelected() && !checkTxt.isSelected()) {
             checkBin.setSelected(true);
         }
-
         String enginePath = findEnginePath();
         if (!new File(enginePath).exists()) {
             error("Nie znaleziono silnika obliczeniowego.\n\n" +
@@ -234,16 +199,17 @@ public class GraphSettingsCard extends JPanel {
             return;
         }
 
-        // output: <inputDir>/positions/<name>_positions(.txt/.bin)
-        File   inputFile  = new File(inputPath);
-        String baseName   = inputFile.getName().replaceFirst("[.][^.]+$", "");
-        File   outDir     = new File(inputFile.getParentFile(), "positions");
+        File   inputFile = new File(inputPath);
+        String baseName  = inputFile.getName().replaceFirst("[.][^.]+$", "");
+        File   outDir    = new File(inputFile.getParentFile(), "positions");
         outDir.mkdirs();
 
         boolean saveTxt = checkTxt.isSelected();
         boolean saveBin = checkBin.isSelected();
-        String  ext     = saveTxt ? ".txt" : ".bin";
-        String  outPath = new File(outDir, baseName + "_positions" + ext).getAbsolutePath();
+
+        // Pass output path WITHOUT extension — engine may or may not add one.
+        // We resolve the actual file in done() by checking what was created.
+        String outBase = new File(outDir, baseName + "_positions").getAbsolutePath();
 
         String algo = radioFrucht.isSelected() ? "fruchterman" : "triangulation";
         footer.setStatus("Obliczanie (" + algo + ")…");
@@ -255,7 +221,7 @@ public class GraphSettingsCard extends JPanel {
                 cmd.add(enginePath);
                 cmd.add(inputPath);
                 cmd.add("-a"); cmd.add(algo);
-                cmd.add("-o"); cmd.add(outPath);
+                cmd.add("-o"); cmd.add(outBase);
                 if (saveTxt) cmd.add("-t");
                 if (saveBin) cmd.add("-b");
 
@@ -284,12 +250,34 @@ public class GraphSettingsCard extends JPanel {
             protected void done() {
                 try {
                     get();
-                    if (saveTxt) applyPositionsTxt(outPath);
-                    else         applyPositionsBin(outPath);
+
+                    // Resolve actual output file — engine may or may not add extension.
+                    // Check in order: with ext, without ext.
+                    String ext    = saveTxt ? ".txt" : ".bin";
+                    File   withExt   = new File(outBase + ext);
+                    File   withoutExt = new File(outBase);
+
+                    String resolved;
+                    if      (withExt.exists())    resolved = withExt.getAbsolutePath();
+                    else if (withoutExt.exists()) resolved = withoutExt.getAbsolutePath();
+                    else throw new IOException(
+                        "Nie znaleziono pliku wyjściowego silnika.\n" +
+                        "Szukano:\n  " + withExt.getAbsolutePath() +
+                        "\n  " + withoutExt.getAbsolutePath());
+
+                    if (saveTxt) applyPositionsTxt(resolved);
+                    else         applyPositionsBin(resolved);
+
                     footer.setStatus("Gotowy — " + graph.getVertices().size() + " wierzchołków");
                     switchToInteraction(inputPath);
+
+                } catch (ExecutionException ex) {
+                    // unwrap: ExecutionException wraps the real exception from doInBackground
+                    Throwable cause = ex.getCause();
+                    error("Błąd silnika:\n" + (cause != null ? describe(cause) : describe(ex)));
+                    footer.setStatus("Błąd obliczania");
                 } catch (Exception ex) {
-                    error("Błąd:\n" + ex.getMessage());
+                    error("Błąd:\n" + describe(ex));
                     footer.setStatus("Błąd obliczania");
                 }
             }
@@ -308,57 +296,28 @@ public class GraphSettingsCard extends JPanel {
 
     private static String findEnginePath() {
         String[] candidates = {
-            "bin/engine/engine.exe",        // working dir = app/
-            "app/bin/engine/engine.exe",    // working dir = project root
-            "../bin/engine/engine.exe",     // just in case
+            "bin/engine/engine.exe",
+            "app/bin/engine/engine.exe",
+            "../bin/engine/engine.exe",
         };
-        for (String c : candidates) {
+        for (String c : candidates)
             if (new File(c).exists()) return new File(c).getAbsolutePath();
-        }
-        // return first candidate as absolute so error message shows real path
         return new File("bin/engine/engine.exe").getAbsolutePath();
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // Little-endian binary reader (matches C engine output)
+    // Helpers
     // ─────────────────────────────────────────────────────────────────
 
-    private static List<Vertex> readBinLittleEndian(String path) throws IOException {
-        List<Vertex> list = new ArrayList<>();
-        try (FileInputStream fis = new FileInputStream(path)) {
-            byte[] buf8 = new byte[8];
-            while (true) {
-                int nameLen = fis.read();
-                if (nameLen == -1) break;
-                byte[] nameBytes = new byte[nameLen];
-                if (fis.read(nameBytes) != nameLen)
-                    throw new IOException("Plik binarny niekompletny");
-                if (fis.read(buf8) != 8)
-                    throw new IOException("Plik binarny niekompletny");
-                double x = ByteBuffer.wrap(buf8.clone())
-                                     .order(ByteOrder.LITTLE_ENDIAN).getDouble();
-                if (fis.read(buf8) != 8)
-                    throw new IOException("Plik binarny niekompletny");
-                double y = ByteBuffer.wrap(buf8.clone())
-                                     .order(ByteOrder.LITTLE_ENDIAN).getDouble();
-                int id = Integer.parseInt(new String(nameBytes).trim());
-                list.add(new Vertex(id, (int) x, (int) y));
-            }
-        }
-        if (list.isEmpty()) throw new IOException("Plik binarny jest pusty");
-        return list;
+    /** Extracts a non-null, non-blank description from any Throwable. */
+    static String describe(Throwable t) {
+        String msg = t.getMessage();
+        if (msg != null && !msg.isBlank()) return msg;
+        return t.getClass().getSimpleName() + " (brak opisu)";
     }
 
-    // ─────────────────────────────────────────────────────────────────
-    // Style helpers (package-visible for GraphInteractionPanel)
-    // ─────────────────────────────────────────────────────────────────
-
-    static JPanel box() {
-        JPanel p = new JPanel();
-        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
-        p.setBackground(BG);
-        p.setAlignmentX(LEFT_ALIGNMENT);
-        return p;
+    private void error(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Błąd", JOptionPane.ERROR_MESSAGE);
     }
 
     private JPanel browseRow(JTextField field, boolean dirMode) {
@@ -382,8 +341,12 @@ public class GraphSettingsCard extends JPanel {
         return row;
     }
 
-    private void error(String msg) {
-        JOptionPane.showMessageDialog(this, msg, "Błąd", JOptionPane.ERROR_MESSAGE);
+    static JPanel box() {
+        JPanel p = new JPanel();
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        p.setBackground(BG);
+        p.setAlignmentX(LEFT_ALIGNMENT);
+        return p;
     }
 
     static JTextField styledField() {
