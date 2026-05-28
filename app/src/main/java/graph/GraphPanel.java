@@ -206,6 +206,45 @@ public class GraphPanel extends JPanel {
         panY = 0;
         repaint();
     }
+    /**
+ * Automatically adjusts zoom and pan so the entire graph fits neatly in the panel.
+ */
+public void fitToView() {
+    if (vertices.isEmpty()) return;
+
+    double minX = Double.MAX_VALUE, maxX = -Double.MAX_VALUE;
+    double minY = Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
+
+    for (Vertex v : vertices) {
+        if (v.x < minX) minX = v.x;
+        if (v.x > maxX) maxX = v.x;
+        if (v.y < minY) minY = v.y;
+        if (v.y > maxY) maxY = v.y;
+    }
+
+    double graphW = maxX - minX;
+    double graphH = maxY - minY;
+
+    // avoid division by zero for single-vertex or collinear graphs
+    if (graphW < 1) graphW = 1;
+    if (graphH < 1) graphH = 1;
+
+    int    panelW  = getWidth();
+    int    panelH  = getHeight();
+    double padding = 80.0;   // pixels of breathing room on each side
+
+    double scaleX = (panelW - padding * 2) / graphW;
+    double scaleY = (panelH - padding * 2) / graphH;
+    scale = Math.min(scaleX, scaleY);   // fit inside, keep aspect ratio
+
+    // translate so the graph centre lands on the panel centre
+    double centerX = (minX + maxX) / 2.0;
+    double centerY = (minY + maxY) / 2.0;
+    panX = (int) (panelW / 2.0 - centerX * scale);
+    panY = (int) (panelH / 2.0 - centerY * scale);
+
+    repaint();
+}
 
 
 }

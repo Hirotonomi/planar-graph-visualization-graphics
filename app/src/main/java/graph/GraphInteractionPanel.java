@@ -65,6 +65,14 @@ public class GraphInteractionPanel extends JPanel {
             footer.setStatus("Widok wyśrodkowany");
         });
         add(centerBtn);
+        add(vgap(6));
+        JButton fitBtn = styledButton("Dopasuj do widoku");
+        fitBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
+        fitBtn.addActionListener(e -> {
+            graphPanel.fitToView();
+            footer.setStatus("Graf dopasowany do okna");
+        });
+        add(fitBtn);
         add(vgap(14));
 
         // ── save ──────────────────────────────────────────────────────
