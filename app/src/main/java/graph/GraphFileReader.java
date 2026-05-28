@@ -143,9 +143,10 @@ import java.util.*;
 
             // Każdy rekord wierzchołka zajmuje dokładnie 20 bajtów (8 + 8 + 4)
             while (buffer.remaining() >= 20) {
+                int id = buffer.getInt();
                 double x = buffer.getDouble();
                 double y = buffer.getDouble();
-                int id = buffer.getInt();
+                
 
                 // Dodajemy wierzchołek, rzutując współrzędne double na int (zgodnie z konstruktorem Twojej klasy Vertex)
                 list.add(new Vertex(id, x, y));

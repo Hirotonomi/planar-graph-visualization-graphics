@@ -207,7 +207,6 @@ public class GraphSettingsCard extends JPanel {
         boolean saveTxt = checkTxt.isSelected();
         boolean saveBin = checkBin.isSelected();
 
-        // Pass output path WITHOUT extension — engine uses this raw base.
         String outBase = new File(outDir, baseName + "_positions").getAbsolutePath();
 
         String algo = radioFrucht.isSelected() ? "fruchterman" : "triangulation";
@@ -216,13 +215,17 @@ public class GraphSettingsCard extends JPanel {
         SwingWorker<Void, String> worker = new SwingWorker<>() {
             @Override
             protected Void doInBackground() throws Exception {
+                String outPath;
+                if (saveTxt) {outPath = outBase + ".txt";} 
+                else {outPath = outBase;}
+
                 List<String> cmd = new ArrayList<>();
                 cmd.add(enginePath);
                 cmd.add(inputPath);
                 cmd.add("-a"); cmd.add(algo);
-                cmd.add("-o"); cmd.add(outBase);
+                cmd.add("-o"); cmd.add(outPath);          
                 if (saveTxt) cmd.add("-t");
-                if (saveBin) cmd.add("-b");
+                else if (saveBin) cmd.add("-b");
 
                 Process proc = new ProcessBuilder(cmd)
                         .redirectErrorStream(true)
@@ -247,35 +250,24 @@ public class GraphSettingsCard extends JPanel {
 
             @Override
             protected void done() {
-             try {
-                    get();
-                    String ext = saveTxt ? ".txt" : "";
-                    File expectedFile = new File(outBase + ext);
-
-                    if (!expectedFile.exists()) {
-                        boolean created = expectedFile.createNewFile();
-                        if (!created) {
-                            throw new IOException("Nie udało się utworzyć wymaganego pliku: " + expectedFile.getAbsolutePath());
-                        }
+                try {
+                    if (saveTxt) {
+                        File txtFile = new File(outBase + ".txt");
+                        if (!txtFile.exists()) throw new IOException("Brak pliku TXT: " + txtFile);
+                        applyPositionsTxt(txtFile.getAbsolutePath());
                     }
-                    String resolved = expectedFile.getAbsolutePath();
+                    if (saveBin) {
+                        File binFile = new File(outBase);
+                        if (!binFile.exists()) throw new IOException("Brak pliku binarnego: " + binFile);
+                        applyPositionsBin(binFile.getAbsolutePath());
+                    }
 
-                if (saveTxt) applyPositionsTxt(resolved);
-                else applyPositionsBin(resolved);
-                footer.setStatus("Gotowy — " + graph.getVertices().size() + " wierzchołków");
-                switchToInteraction(inputPath);
+                    footer.setStatus("Gotowy — " + graph.getVertices().size() + " wierzchołków");
+                    switchToInteraction(inputPath);
 
-                }
-                
-                catch (IOException e) {
+                } catch (IOException e) {
                     error("Błąd operacji na pliku:\n" + describe(e));
                     footer.setStatus("Błąd zapisu/odczytu");
-                }   
-                catch (ExecutionException ex) {
-                    // unwrap: ExecutionException wraps the real exception from doInBackground
-                    Throwable cause = ex.getCause();
-                    error("Błąd silnika:\n" + (cause != null ? describe(cause) : describe(ex)));
-                    footer.setStatus("Błąd obliczania");
                 } catch (Exception ex) {
                     error("Błąd:\n" + describe(ex));
                     footer.setStatus("Błąd obliczania");
