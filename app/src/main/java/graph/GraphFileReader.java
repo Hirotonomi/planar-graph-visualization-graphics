@@ -3,6 +3,7 @@
     import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
 import java.util.*;
 
     public class GraphFileReader {
@@ -122,59 +123,37 @@ import java.util.*;
         }
 
         /**
-         * Reads a binary position file produced by the Vyshnia/Udavichenka engine.
-         *
-         * Per-record layout:
-         *   [1 byte]   name length (unsigned)
-         *   [n bytes]  vertex name as ASCII
-         *   [8 bytes]  x coordinate — IEEE 754 double, LITTLE-ENDIAN
-         *   [8 bytes]  y coordinate — IEEE 754 double, LITTLE-ENDIAN
-         *
-         * NOTE: replaces readBinaryInput() which used DataInputStream.readDouble()
-         * (big-endian). The C engine writes little-endian on x86 — this method
-         * reads correctly.
+         * Reads a binary position file produced by the engine.
+         * * Actual per-record layout discovered from the binary dump:
+         * [8 bytes]  x coordinate — IEEE 754 double, LITTLE-ENDIAN
+         * [8 bytes]  y coordinate — IEEE 754 double, LITTLE-ENDIAN
+         * [4 bytes]  vertex ID    — 32-bit integer, LITTLE-ENDIAN
+         * * Total record size: 20 bytes.
          */
         public static List<Vertex> readBinaryInput(String path) throws IOException {
             List<Vertex> list = new ArrayList<>();
+            File file = new File(path);
+            if (!file.exists()) return list;
 
-            try (FileInputStream fis = new FileInputStream(path)) {
-                byte[] buf8 = new byte[8];
+            // Wczytujemy zawartość całego pliku do tablicy bajtów
+            byte[] allBytes = Files.readAllBytes(file.toPath());
+            
+            // Wrapujemy w ByteBuffer i ustawiamy porządek bajtów silnika (Little-Endian)
+            ByteBuffer buffer = ByteBuffer.wrap(allBytes).order(ByteOrder.LITTLE_ENDIAN);
 
-                while (true) {
-                    int nameLen = fis.read();
-                    if (nameLen == -1) break;                    // clean EOF
+            // Każdy rekord wierzchołka zajmuje dokładnie 20 bajtów (8 + 8 + 4)
+            while (buffer.remaining() >= 20) {
+                double x = buffer.getDouble();
+                double y = buffer.getDouble();
+                int id = buffer.getInt();
 
-                    byte[] nameBytes = new byte[nameLen];
-                    int nameRead = fis.read(nameBytes);
-                    if (nameRead != nameLen)
-                        throw new IOException("Plik binarny niekompletny (nazwa wierzchołka)");
-
-                    if (fis.read(buf8) != 8)
-                        throw new IOException("Plik binarny niekompletny (współrzędna x)");
-                    double x = ByteBuffer.wrap(buf8.clone())
-                                        .order(ByteOrder.LITTLE_ENDIAN)
-                                        .getDouble();
-
-                    if (fis.read(buf8) != 8)
-                        throw new IOException("Plik binarny niekompletny (współrzędna y)");
-                    double y = ByteBuffer.wrap(buf8.clone())
-                                        .order(ByteOrder.LITTLE_ENDIAN)
-                                        .getDouble();
-
-                    String name = new String(nameBytes, "ASCII").trim();
-                    int id;
-                    try {
-                        id = Integer.parseInt(name);
-                    } catch (NumberFormatException e) {
-                        throw new IOException("Nieprawidłowa nazwa wierzchołka w pliku binarnym: '" + name + "'");
-                    }
-
-                    list.add(new Vertex(id, (int) x, (int) y));
-                }
+                // Dodajemy wierzchołek, rzutując współrzędne double na int (zgodnie z konstruktorem Twojej klasy Vertex)
+                list.add(new Vertex(id, (int) x, (int) y));
             }
 
-            if (list.isEmpty())
+            if (list.isEmpty()) {
                 throw new IOException("Plik binarny jest pusty lub ma nieprawidłowy format");
+            }
 
             return list;
         }

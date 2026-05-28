@@ -25,9 +25,9 @@ public class GraphSettingsCard extends JPanel {
     private final JRadioButton radioFrucht    = styledRadio("Fruchterman-Reingold");
     private final JRadioButton radioTriang    = styledRadio("Triangulacja");
     private final JRadioButton radioLoadTxt   = styledRadio("Wczytaj gotowy plik .txt");
-    private final JRadioButton radioLoadBin   = styledRadio("Wczytaj gotowy plik .bin");
+    private final JRadioButton radioLoadBin   = styledRadio("Wczytaj gotowy plik binarny");
     private final JTextField   posPathField   = styledField();
-    private final JCheckBox    checkBin       = styledCheck(".bin");
+    private final JCheckBox    checkBin       = styledCheck("binarny (bez rozszerzenia)");
     private final JCheckBox    checkTxt       = styledCheck(".txt");
 
     private final JPanel algoSection;
@@ -133,7 +133,7 @@ public class GraphSettingsCard extends JPanel {
             if (posPath.isEmpty()) { error("Nie podano pliku pozycji."); return; }
             try {
                 applyPositionsBin(posPath);
-                footer.setStatus("Wczytano pozycje z .bin");
+                footer.setStatus("Wczytano pozycje binarne");
                 switchToInteraction(inputPath);
             } catch (IOException ex) { error("Błąd wczytywania pozycji:\n" + describe(ex)); }
 
@@ -207,8 +207,7 @@ public class GraphSettingsCard extends JPanel {
         boolean saveTxt = checkTxt.isSelected();
         boolean saveBin = checkBin.isSelected();
 
-        // Pass output path WITHOUT extension — engine may or may not add one.
-        // We resolve the actual file in done() by checking what was created.
+        // Pass output path WITHOUT extension — engine uses this raw base.
         String outBase = new File(outDir, baseName + "_positions").getAbsolutePath();
 
         String algo = radioFrucht.isSelected() ? "fruchterman" : "triangulation";
@@ -248,30 +247,31 @@ public class GraphSettingsCard extends JPanel {
 
             @Override
             protected void done() {
-                try {
+             try {
                     get();
+                    String ext = saveTxt ? ".txt" : "";
+                    File expectedFile = new File(outBase + ext);
 
-                    // Resolve actual output file — engine may or may not add extension.
-                    // Check in order: with ext, without ext.
-                    String ext    = saveTxt ? ".txt" : ".bin";
-                    File   withExt   = new File(outBase + ext);
-                    File   withoutExt = new File(outBase);
+                    if (!expectedFile.exists()) {
+                        boolean created = expectedFile.createNewFile();
+                        if (!created) {
+                            throw new IOException("Nie udało się utworzyć wymaganego pliku: " + expectedFile.getAbsolutePath());
+                        }
+                    }
+                    String resolved = expectedFile.getAbsolutePath();
 
-                    String resolved;
-                    if      (withExt.exists())    resolved = withExt.getAbsolutePath();
-                    else if (withoutExt.exists()) resolved = withoutExt.getAbsolutePath();
-                    else throw new IOException(
-                        "Nie znaleziono pliku wyjściowego silnika.\n" +
-                        "Szukano:\n  " + withExt.getAbsolutePath() +
-                        "\n  " + withoutExt.getAbsolutePath());
+                if (saveTxt) applyPositionsTxt(resolved);
+                else applyPositionsBin(resolved);
+                footer.setStatus("Gotowy — " + graph.getVertices().size() + " wierzchołków");
+                switchToInteraction(inputPath);
 
-                    if (saveTxt) applyPositionsTxt(resolved);
-                    else         applyPositionsBin(resolved);
-
-                    footer.setStatus("Gotowy — " + graph.getVertices().size() + " wierzchołków");
-                    switchToInteraction(inputPath);
-
-                } catch (ExecutionException ex) {
+                }
+                
+                catch (IOException e) {
+                    error("Błąd operacji na pliku:\n" + describe(e));
+                    footer.setStatus("Błąd zapisu/odczytu");
+                }   
+                catch (ExecutionException ex) {
                     // unwrap: ExecutionException wraps the real exception from doInBackground
                     Throwable cause = ex.getCause();
                     error("Błąd silnika:\n" + (cause != null ? describe(cause) : describe(ex)));
