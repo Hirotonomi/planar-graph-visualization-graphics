@@ -27,8 +27,9 @@ public class GraphSettingsCard extends JPanel {
     private final JRadioButton radioLoadTxt   = styledRadio("Wczytaj gotowy plik .txt");
     private final JRadioButton radioLoadBin   = styledRadio("Wczytaj gotowy plik binarny");
     private final JTextField   posPathField   = styledField();
-    private final JCheckBox    checkBin       = styledCheck("binarny (bez rozszerzenia)");
-    private final JCheckBox    checkTxt       = styledCheck(".txt");
+
+    private final JRadioButton radioTxt = styledRadio(".txt");
+    private final JRadioButton radioBin = styledRadio("binarny (bez rozszerzenia)");
 
     private final JPanel algoSection;
     private final JPanel loadSection;
@@ -49,10 +50,10 @@ public class GraphSettingsCard extends JPanel {
         add(vgap(12));
 
         add(sectionLabel("Tryb"));
-        ButtonGroup group = new ButtonGroup();
+        ButtonGroup modeGroup = new ButtonGroup();
         for (JRadioButton r : new JRadioButton[]{
                 radioFrucht, radioTriang, radioLoadTxt, radioLoadBin}) {
-            group.add(r);
+            modeGroup.add(r);
         }
         radioFrucht.setSelected(true);
 
@@ -74,13 +75,18 @@ public class GraphSettingsCard extends JPanel {
         algoSection = box();
         algoSection.add(sectionLabel(
             "Format zapisu  (folder 'positions' obok pliku grafu)"));
-        JPanel fmtRow = box();
-        fmtRow.setLayout(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        checkBin.setSelected(true);
-        fmtRow.add(checkBin);
-        fmtRow.add(Box.createHorizontalStrut(10));
-        fmtRow.add(checkTxt);
-        algoSection.add(fmtRow);
+        JPanel formatRow = box();
+        formatRow.setLayout(new FlowLayout(FlowLayout.LEFT, 0, 0));
+
+        ButtonGroup formatGroup = new ButtonGroup();
+        formatGroup.add(radioBin);
+        formatGroup.add(radioTxt);
+        radioBin.setSelected(true);   // default: binary
+
+        formatRow.add(radioBin);
+        formatRow.add(Box.createHorizontalStrut(10));
+        formatRow.add(radioTxt);
+        algoSection.add(formatRow);
         add(algoSection);
 
         Runnable sync = () -> {
@@ -170,7 +176,6 @@ public class GraphSettingsCard extends JPanel {
     }
 
     private void applyPositionsBin(String path) throws IOException {
-        // Uses the correct little-endian reader to match C engine output.
         applyToGraph(GraphFileReader.readBinaryInput(path));
     }
 
@@ -186,9 +191,6 @@ public class GraphSettingsCard extends JPanel {
     // ─────────────────────────────────────────────────────────────────
 
     private void runEngine(String inputPath) {
-        if (!checkBin.isSelected() && !checkTxt.isSelected()) {
-            checkBin.setSelected(true);
-        }
         String enginePath = findEnginePath();
         if (!new File(enginePath).exists()) {
             error("Nie znaleziono silnika obliczeniowego.\n\n" +
@@ -204,8 +206,7 @@ public class GraphSettingsCard extends JPanel {
         File   outDir    = new File(inputFile.getParentFile(), "positions");
         outDir.mkdirs();
 
-        boolean saveTxt = checkTxt.isSelected();
-        boolean saveBin = checkBin.isSelected();
+        boolean saveTxt = radioTxt.isSelected();
 
         String outBase = new File(outDir, baseName + "_positions").getAbsolutePath();
 
@@ -223,23 +224,30 @@ public class GraphSettingsCard extends JPanel {
                 cmd.add(enginePath);
                 cmd.add(inputPath);
                 cmd.add("-a"); cmd.add(algo);
-                cmd.add("-o"); cmd.add(outPath);          
+                cmd.add("-o"); cmd.add(outPath);
                 if (saveTxt) cmd.add("-t");
-                else if (saveBin) cmd.add("-b");
+                else cmd.add("-b");
 
                 Process proc = new ProcessBuilder(cmd)
                         .redirectErrorStream(true)
                         .start();
 
+                StringBuilder outputBuffer = new StringBuilder();
                 try (BufferedReader br = new BufferedReader(
                         new InputStreamReader(proc.getInputStream()))) {
                     String line;
-                    while ((line = br.readLine()) != null) publish(line);
+                    while ((line = br.readLine()) != null) {
+                        publish(line);
+                        outputBuffer.append(line).append("\n");
+                    }
                 }
 
                 int code = proc.waitFor();
-                if (code != 0)
-                    throw new IOException("Silnik zakończył z kodem błędu: " + code);
+                if (code != 0) {
+                    throw new IOException(
+                        "Silnik zakończył z kodem błędu " + code + ":\n" +
+                        outputBuffer.toString().trim());
+                }
                 return null;
             }
 
@@ -251,12 +259,12 @@ public class GraphSettingsCard extends JPanel {
             @Override
             protected void done() {
                 try {
+                    get();
                     if (saveTxt) {
                         File txtFile = new File(outBase + ".txt");
                         if (!txtFile.exists()) throw new IOException("Brak pliku TXT: " + txtFile);
                         applyPositionsTxt(txtFile.getAbsolutePath());
-                    }
-                    if (saveBin) {
+                    } else {
                         File binFile = new File(outBase);
                         if (!binFile.exists()) throw new IOException("Brak pliku binarnego: " + binFile);
                         applyPositionsBin(binFile.getAbsolutePath());
@@ -268,6 +276,10 @@ public class GraphSettingsCard extends JPanel {
                 } catch (IOException e) {
                     error("Błąd operacji na pliku:\n" + describe(e));
                     footer.setStatus("Błąd zapisu/odczytu");
+                } catch (ExecutionException ex) {
+                    Throwable cause = ex.getCause();
+                    error("Błąd silnika:\n" + (cause != null ? describe(cause) : describe(ex)));
+                    footer.setStatus("Błąd obliczania");
                 } catch (Exception ex) {
                     error("Błąd:\n" + describe(ex));
                     footer.setStatus("Błąd obliczania");
@@ -301,7 +313,6 @@ public class GraphSettingsCard extends JPanel {
     // Helpers
     // ─────────────────────────────────────────────────────────────────
 
-    /** Extracts a non-null, non-blank description from any Throwable. */
     static String describe(Throwable t) {
         String msg = t.getMessage();
         if (msg != null && !msg.isBlank()) return msg;
@@ -367,7 +378,7 @@ public class GraphSettingsCard extends JPanel {
         r.setFont(FONT); r.setAlignmentX(LEFT_ALIGNMENT);
         return r;
     }
-
+// still kep it here because it's used in GraphInteractionPanel
     static JCheckBox styledCheck(String text) {
         JCheckBox c = new JCheckBox(text);
         c.setBackground(BG); c.setForeground(FG);
